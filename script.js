@@ -468,17 +468,40 @@ function switchSidebarTab(tab, forceOpen = false) {
         state.sidebarVisible = true;
     }
 
-    const isFiles = tab === 'files';
+    // Clear chat notifications when opening chat
+    if (tab === 'chat' && window.socketClient) {
+        window.socketClient.clearNotifications();
+    }
 
-    filesPanel.classList.toggle('active', isFiles);
-    importPanel.classList.toggle('active', !isFiles);
-    activityFilesBtn.classList.toggle('active', isFiles);
-    activityImportBtn.classList.toggle('active', !isFiles);
+    // Update panel visibility
+    const panels = ['filesPanel', 'importPanel', 'chatPanel'];
+    const buttons = ['activityFilesBtn', 'activityImportBtn', 'activityChatBtn'];
+    
+    panels.forEach(panelId => {
+        const panel = document.getElementById(panelId);
+        if (panel) {
+            panel.classList.remove('active');
+        }
+    });
+    
+    buttons.forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            btn.classList.remove('active');
+        }
+    });
+    
+    // Activate selected panel and button
+    const activePanel = document.getElementById(tab + 'Panel');
+    const activeBtn = document.getElementById('activity' + tab.charAt(0).toUpperCase() + tab.slice(1) + 'Btn');
+    
+    if (activePanel) activePanel.classList.add('active');
+    if (activeBtn) activeBtn.classList.add('active');
 
     applySidebarLayout();
 
     if (addFileBtn) {
-        addFileBtn.style.display = isFiles ? 'flex' : 'none';
+        addFileBtn.style.display = (tab === 'files') ? 'flex' : 'none';
     }
 
     schedulePersistState();
@@ -3036,6 +3059,14 @@ function createCollabRoom(existingCode = null) {
         return;
     }
     
+    // Prompt for username if not already set
+    let username = prompt('Enter your username for collaboration:');
+    if (!username || !username.trim()) {
+        showCollabStatus('webrtc', '❌ Username is required to create a room', 'error');
+        return;
+    }
+    username = username.trim();
+    
     try {
         roomCode = existingCode || generateRoomCode();
         
@@ -3060,6 +3091,12 @@ function createCollabRoom(existingCode = null) {
             showCollabStatus('webrtc', `✅ Room created! Share code: ${id}`, 'success');
             saveCollabSession('host', id);
             reconnectAttempts = 0;
+            
+            // Auto-connect to chat with the same room code
+            if (window.socketClient && window.socketClient.isConnected()) {
+                window.socketClient.authenticate(username, id);
+                showToast('Connected to chat room', 'success');
+            }
         });
         
         peer.on('connection', (connection) => {
@@ -3112,6 +3149,14 @@ function joinCollabRoom() {
         return;
     }
     
+    // Prompt for username if not already set
+    let username = prompt('Enter your username for collaboration:');
+    if (!username || !username.trim()) {
+        showCollabStatus('webrtc', '❌ Username is required to join a room', 'error');
+        return;
+    }
+    username = username.trim();
+    
     try {
         // Create peer and connect to room
         peer = new Peer({
@@ -3129,6 +3174,12 @@ function joinCollabRoom() {
             conn = peer.connect(code, { reliable: true });
             setupPeerConnection();
             saveCollabSession('guest', code);
+            
+            // Auto-connect to chat with the same room code
+            if (window.socketClient && window.socketClient.isConnected()) {
+                window.socketClient.authenticate(username, code);
+                showToast('Connected to chat room', 'success');
+            }
         });
         
         peer.on('disconnected', () => {
@@ -3173,6 +3224,11 @@ function disconnectCollab() {
     document.getElementById('collabIcon').classList.remove('connected');
     clearCollabSession();
     reconnectAttempts = 0;
+    
+    // Also disconnect from chat
+    if (window.socketClient) {
+        window.socketClient.disconnect();
+    }
     
     const display = document.getElementById('roomCodeDisplay');
     if (display) {
@@ -3390,3 +3446,159 @@ window.addEventListener('beforeunload', () => {
         broadcastChannel.close();
     }
 });
+
+
+// ==================== CHAT HELPER FUNCTIONS ====================
+
+function handleChatCreate() {
+    const username = document.getElementById('chatUsername').value.trim();
+    if (!username) {
+        showToast('Please enter a username', 'error');
+        return;
+    }
+    
+    // Generate room code
+    const roomCode = generateChatRoomCode();
+    document.getElementById('chatRoomCode').value = roomCode;
+    
+    // Authenticate
+    if (window.socketClient) {
+        window.socketClient.authenticate(username, roomCode);
+    }
+}
+
+function handleChatJoin() {
+    const username = document.getElementById('chatUsername').value.trim();
+    const roomCode = document.getElementById('chatRoomCode').value.trim().toUpperCase();
+    
+    if (!username) {
+        showToast('Please enter a username', 'error');
+        return;
+    }
+    
+    if (!roomCode || roomCode.length !== 12) {
+        showToast('Please enter a valid 12-character room code', 'error');
+        return;
+    }
+    
+    // Authenticate
+    if (window.socketClient) {
+        window.socketClient.authenticate(username, roomCode);
+    }
+}
+
+function handleChatSend() {
+    const input = document.getElementById('chatMessageInput');
+    const message = input.value.trim();
+    
+    if (message && window.socketClient) {
+        window.socketClient.sendMessage(message);
+        input.value = '';
+    }
+}
+
+function handleChatInputKeyPress(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        handleChatSend();
+    }
+}
+
+function handleChatLeave() {
+    if (confirm('Are you sure you want to leave the room?')) {
+        if (window.socketClient) {
+            window.socketClient.disconnect();
+        }
+        
+        // Reset UI
+        document.getElementById('chatUsername').value = '';
+        document.getElementById('chatRoomCode').value = '';
+        document.getElementById('chatMessages').innerHTML = '';
+        showChatAuthForm();
+    }
+}
+
+function copyChatRoomCode() {
+    const roomCode = document.getElementById('chatCurrentRoom').textContent;
+    if (roomCode && roomCode !== '-') {
+        navigator.clipboard.writeText(roomCode).then(() => {
+            showToast('Room code copied!', 'success');
+        }).catch(() => {
+            showToast('Failed to copy room code', 'error');
+        });
+    }
+}
+
+function toggleChatUsers() {
+    const usersList = document.getElementById('chatUsersList');
+    const toggleIcon = document.getElementById('chatUsersToggleIcon');
+    const toggleBtn = document.querySelector('.chat-section-toggle');
+    
+    if (usersList && toggleBtn) {
+        usersList.classList.toggle('collapsed');
+        toggleBtn.classList.toggle('collapsed');
+    }
+}
+
+function generateChatRoomCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 12; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+function showChatAuthForm() {
+    const authForm = document.getElementById('chatAuthForm');
+    const chatInterface = document.getElementById('chatInterface');
+    if (authForm) authForm.style.display = 'flex';
+    if (chatInterface) chatInterface.style.display = 'none';
+}
+
+function showChatInterface() {
+    const authForm = document.getElementById('chatAuthForm');
+    const chatInterface = document.getElementById('chatInterface');
+    if (authForm) authForm.style.display = 'none';
+    if (chatInterface) chatInterface.style.display = 'flex';
+    
+    // Clear notifications when opening chat
+    if (window.socketClient) {
+        window.socketClient.clearNotifications();
+    }
+}
+
+function updateConnectionStatus(message, type) {
+    const status = document.getElementById('chatConnectionStatus');
+    if (!status) return;
+    
+    status.className = `chat-connection-status ${type}`;
+    status.innerHTML = `<i class="fas fa-circle"></i><span>${message}</span>`;
+    
+    if (type === 'connected') {
+        const user = window.socketClient ? window.socketClient.getCurrentUser() : null;
+        if (user && user.username && user.roomCode) {
+            showChatInterface();
+            const roomEl = document.getElementById('chatCurrentRoom');
+            if (roomEl) roomEl.textContent = user.roomCode;
+        }
+    }
+}
+
+function updateRoomUsersList(users) {
+    const usersList = document.getElementById('chatUsersList');
+    const userCount = document.getElementById('chatUserCount');
+    
+    if (!usersList || !userCount) return;
+    
+    userCount.textContent = users.length;
+    
+    const currentUser = window.socketClient ? window.socketClient.getCurrentUser() : null;
+    
+    usersList.innerHTML = users.map(user => `
+        <div class="chat-user-item ${user.username === (currentUser ? currentUser.username : '') ? 'current' : ''}">
+            <i class="fas fa-circle"></i>
+            <span>${user.username}</span>
+        </div>
+    `).join('');
+}

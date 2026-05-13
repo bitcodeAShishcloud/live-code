@@ -89,6 +89,9 @@
                         <path fill="currentColor" d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6zm1 7V4.5L18.5 10H15zm-3 8-4-4h2.5v-3h3v3H16l-4 4z"/>
                     </svg>
                 </button>
+                <button class="activity-btn" id="activityChatBtn" onclick="switchSidebarTab('chat')" title="Chat">
+                    <i class="fas fa-comments"></i>
+                </button>
             </nav>
 
             <!-- Sidebar Panel -->
@@ -127,6 +130,100 @@
                             <span class="ml-5">Import File</span>
                         </button>
                         <small>Supports text-based files: html, css, js, py, json, md and more.</small>
+                    </div>
+                </div>
+
+                <div class="sidebar-panel" id="chatPanel">
+                    <div class="sidebar-header">
+                        <span><i class="fas fa-comments"></i> Chat</span>
+                    </div>
+                    
+                    <!-- Connection Status -->
+                    <div id="chatConnectionStatus" class="chat-connection-status">
+                        <i class="fas fa-circle"></i>
+                        <span>Connecting...</span>
+                    </div>
+                    
+                    <!-- Auth Form (shown when not connected) -->
+                    <div id="chatAuthForm" class="chat-auth-form">
+                        <div class="chat-form-group">
+                            <label for="chatUsername">Username</label>
+                            <input type="text" id="chatUsername" placeholder="Enter your name" maxlength="20" autocomplete="off">
+                        </div>
+                        
+                        <div class="chat-form-group">
+                            <label for="chatRoomCode">Room Code</label>
+                            <input type="text" id="chatRoomCode" placeholder="12-character code" maxlength="12" autocomplete="off">
+                        </div>
+                        
+                        <div class="chat-form-actions">
+                            <button class="btn btn-primary btn-sm" onclick="handleChatJoin()">
+                                <i class="fas fa-sign-in-alt"></i> Join
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="handleChatCreate()">
+                                <i class="fas fa-plus"></i> Create
+                            </button>
+                        </div>
+                        
+                        <div class="chat-info-text">
+                            <small>Create a new room or join an existing one with a 12-character code.</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Interface (shown when connected) -->
+                    <div id="chatInterface" class="chat-interface" style="display: none;">
+                        <!-- Room Info -->
+                        <div class="chat-room-info">
+                            <div class="chat-room-code">
+                                <span class="label">Room:</span>
+                                <span class="code" id="chatCurrentRoom">-</span>
+                                <button class="btn-icon-sm" onclick="copyChatRoomCode()" title="Copy">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div class="chat-user-count">
+                                <i class="fas fa-users"></i>
+                                <span id="chatUserCount">0</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Users List (Collapsible) -->
+                        <div class="chat-users-section">
+                            <button class="chat-section-toggle" onclick="toggleChatUsers()">
+                                <i class="fas fa-chevron-down" id="chatUsersToggleIcon"></i>
+                                <span>Online Users</span>
+                            </button>
+                            <div id="chatUsersList" class="chat-users-list">
+                                <!-- Users will be populated here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Messages -->
+                        <div class="chat-messages-container">
+                            <div id="chatMessages" class="chat-messages">
+                                <!-- Messages will appear here -->
+                            </div>
+                        </div>
+                        
+                        <!-- Input -->
+                        <div class="chat-input-area">
+                            <input 
+                                type="text" 
+                                id="chatMessageInput" 
+                                placeholder="Type a message..." 
+                                maxlength="500"
+                                autocomplete="off"
+                                onkeypress="handleChatInputKeyPress(event)"
+                            >
+                            <button class="btn-icon-primary" onclick="handleChatSend()" title="Send">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Leave Button -->
+                        <button class="btn btn-warning btn-sm chat-leave-btn" onclick="handleChatLeave()">
+                            <i class="fas fa-sign-out-alt"></i> Leave Room
+                        </button>
                     </div>
                 </div>
             </aside>
@@ -542,6 +639,12 @@
         window.codeMirrorReady = true;
         window.dispatchEvent(new Event('codemirror-ready'));
     </script>
+    
+    <!-- Socket.io Client -->
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    
+    <!-- Socket Client Integration -->
+    <script src="socket-client.js"></script>
     
     <script src="script.js"></script>
 </body>

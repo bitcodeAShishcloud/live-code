@@ -1,300 +1,232 @@
-# ⚡ Live Code Compiler Pro
+# Live Compiler Pro 🚀
 
-A powerful in-browser code playground with **real-time collaboration**, theme switching, code snippets, and live preview. Built with vanilla JavaScript - no backend required!
+A powerful live code editor with real-time collaboration and integrated chat.
 
-![Version](https://img.shields.io/badge/version-2.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Status](https://img.shields.io/badge/status-active-success)
+## Features ✨
 
-## 🌐 Live Demo
+### Code Editor
+- 🎨 Multi-language support (HTML, CSS, JavaScript, Python, JSON, Markdown)
+- 🔄 Live preview with auto-refresh
+- 💻 CodeMirror 6 integration
+- 🎯 Syntax highlighting
+- 📝 Code formatting (Prettier)
+- 🌓 Dark/Light theme
 
-Try it now - no installation required!
+### Live Collaboration
+- 👥 Real-time code sharing via WebRTC (P2P)
+- 🔒 Room-based isolation with 12-character codes
+- 🔄 Automatic synchronization
+- 💬 **Integrated chat** - automatically connects when joining collaboration
 
-- **GitHub Pages**: [https://bitcodeashishcloud.github.io/live-code/](https://bitcodeashishcloud.github.io/live-code/)
-- **Vercel** (Recommended for Collaboration): [https://live-code-nine.vercel.app/](https://live-code-nine.vercel.app/)
+### Chat System
+- 💬 Real-time messaging via Socket.io
+- 🔔 Notification badges for new messages
+- 👤 Username uniqueness with smart suggestions
+- 🔒 Room isolation - messages never cross rooms
+- 📱 Browser notifications support
+- 👥 Online user list
+- ⚡ Auto-connects with collaboration rooms
 
-> **Note:** For WebRTC collaboration features, use the Vercel deployment as it supports HTTPS.
+### Additional Features
+- 📦 Import/Export files
+- 🗂️ Multiple file management
+- 📱 Responsive design
+- 🎨 Code snippets library
+- 🔍 Console with JavaScript execution
 
-## ✨ Features
+## Quick Start 🚀
 
-### 🎨 **Core Features**
-- **Multi-language Support**: HTML, CSS, JavaScript, Python, JSON, Markdown
-- **Live Preview**: Real-time preview with console output
-- **Smart Editor**: Auto-indentation, bracket matching, syntax highlighting
-- **File Management**: Multi-file tabs, import/export, grouped sidebar
-- **Undo/Redo**: Per-file history with Ctrl+Z / Ctrl+Shift+Z
-
-### 🌓 **Theme Switcher**
-- Toggle between dark and light modes
-- Smooth transitions and persistent preferences
-- Modern glassmorphism design
-
-### 📚 **Code Snippets Library**
-- 20+ pre-built templates
-- HTML5 boilerplate, responsive cards, navigation bars
-- CSS flexbox, grid, glassmorphism, animations
-- JavaScript fetch API, DOM manipulation, local storage
-- Python list comprehensions, decorators, classes
-- One-click insertion into your project
-
-### 🤝 **Live Collaboration** (NEW!)
-Two collaboration modes:
-
-#### **WebRTC P2P** (Cross-device)
-- Real-time collaboration without a backend
-- Share a 12-character room code
-- Works across different devices and networks
-- Powered by PeerJS with free signaling servers
-
-#### **BroadcastChannel** (Same browser)
-- Sync across multiple tabs instantly
-- Perfect for testing and development
-- One-click enable/disable
-
-### 📦 **Export as ZIP**
-- Download all files at once
-- Complete project archive
-- Easy sharing and backup
-
-### ⌨️ **Keyboard Shortcuts**
-- `Ctrl/Cmd + S` or `Ctrl/Cmd + Enter` - Run code
-- `Ctrl/Cmd + Shift + P` - Toggle preview
-- `Ctrl/Cmd + Shift + F` - Format current file
-- `Ctrl/Cmd + B` - Toggle sidebar
-- `F5` - Refresh preview
-- `Ctrl/Cmd + Z` - Undo
-- `Ctrl/Cmd + Shift + Z` or `Ctrl/Cmd + Y` - Redo
-
-### 🎯 **Additional Features**
-- Resizable sidebar and preview panels
-- Console output with timestamps
-- Python execution via Pyodide
-- Markdown live preview
-- Auto-save to localStorage
-- Import local files
-- Prettier code formatting
-
-## 🚀 Quick Start
-
-### Option 1: Local Development
+### 1. Install Dependencies
 ```bash
-# Clone the repository
-git clone https://github.com/bitcodeAShishcloud/Live-UI-MAKER.git
-
-# Navigate to folder
-cd Live-UI-MAKER
-
-# Start a local server (choose one):
-# Using Python
-python -m http.server 8000
-
-# Using Node.js
-npx serve .
-
-# Using VS Code
-# Install "Live Server" extension and click "Go Live"
+npm install
 ```
 
-Visit `http://localhost:8000` in your browser.
-
-### Option 2: Deploy to Vercel (Recommended for Collaboration)
+### 2. Start Backend Server
 ```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel
-
-# Get instant URL: https://your-project.vercel.app
+node server.js
 ```
 
-### Option 3: Deploy to Netlify
-1. Go to [netlify.com/drop](https://app.netlify.com/drop)
-2. Drag your project folder
-3. Get instant URL: `https://your-app.netlify.app`
+You should see:
+```
+============================================================
+🚀 Server running on http://localhost:3000
+📡 Socket.io server ready for connections
+🔒 Room isolation enabled
+💬 Chat and WebRTC signaling active
+============================================================
+```
 
-## 🤝 How to Use Collaboration
+### 3. Open Application
+Open `index.html` in your browser or deploy to your hosting platform.
 
-### Same Browser Tabs (Easiest)
+## How to Use Chat 💬
+
+### Method 1: Via Live Collaboration (Recommended)
+
 1. Click **"Collab"** button in header
-2. Switch to **"Same Browser"** tab
-3. Click **"Enable Tab Sync"**
-4. Open the same URL in another tab
-5. Both tabs sync automatically!
+2. Click **"Create New Room"** or **"Join Room"**
+3. Enter your **username** when prompted
+4. ✅ Chat connects automatically!
+5. ✅ Chat panel opens automatically!
+6. Start coding and chatting together!
 
-### WebRTC P2P (Cross-device)
-**Person 1 (Room Creator):**
-1. Click **"Collab"** button
-2. Click **"Create New Room"**
-3. Copy the 12-character code
-4. Share with collaborator
+### Method 2: Via Chat Panel Directly
 
-**Person 2 (Room Joiner):**
-1. Click **"Collab"** button
-2. Enter the room code
-3. Click **"Join Room"**
-4. Start coding together!
+1. Click **chat icon (💬)** in left activity bar
+2. Enter your **username**
+3. Enter **room code** (or click "Create" to generate one)
+4. Click **"Join"** or **"Create"**
+5. Start chatting!
 
-**Note:** WebRTC requires HTTPS. Deploy to Vercel/Netlify for cross-device collaboration.
+## Username Uniqueness 👤
 
-## 📁 Project Structure
+The system enforces unique usernames per room:
+
+- If you try to use a taken username, you'll get **3 smart suggestions**
+- Examples: `Alice2`, `SwiftAlice`, `AlicePro`
+- One-click to auto-select or enter a custom name
+- Case-insensitive matching (Alice = alice = ALICE)
+
+## Room Isolation 🔒
+
+- Each room has a unique **12-character code**
+- Messages and code sync are **completely isolated**
+- Same username can exist in different rooms
+- Rooms exist as long as the host is connected
+
+## Project Structure 📁
 
 ```
-Live-UI-MAKER/
-├── index.html          # Main app shell, UI components
-├── script.js           # Core logic, collaboration, state management
-├── styles.css          # Styling, themes, animations
-├── md.html            # Markdown live preview helper
-├── README.md          # Documentation
-└── TEST_COLLABORATION.md  # Testing guide
+├── index.html              # Main application
+├── styles.css              # All styles (including chat)
+├── script.js               # Main app logic + chat helpers
+├── server.js               # Backend server (Socket.io)
+├── socket-client.js        # Chat client integration
+├── package.json            # Dependencies
+├── .env.example            # Environment variables template
+├── .gitignore              # Git ignore rules
+└── README.md               # This file
 ```
 
-## 🛠️ Technologies Used
+## Configuration ⚙️
 
-- **Frontend**: Vanilla JavaScript (ES6+)
-- **Styling**: CSS3 with CSS Variables
-- **Collaboration**: WebRTC + PeerJS, BroadcastChannel API
-- **Code Formatting**: Prettier (CDN)
-- **Python Runtime**: Pyodide (CDN)
-- **Icons**: Font Awesome
-- **Fonts**: Inter, Outfit, Fira Code
-- **Export**: JSZip
+### Backend Server URL
+Default: `http://localhost:3000`
 
-## 🎨 Themes
+To change for production:
+1. Edit `socket-client.js`
+2. Update `SERVER_URL` constant
+3. Deploy backend to your server
 
-- **Dark Mode** (Default): Modern dark theme with glassmorphism
-- **Light Mode**: Clean light theme for daytime coding
+### Port Configuration
+Default: `3000`
 
-Toggle with the moon/sun icon in the header.
+To change:
+```bash
+# Via environment variable
+PORT=8080 node server.js
 
-## 📝 Code Snippets Categories
+# Or edit server.js
+const PORT = process.env.PORT || 3000;
+```
 
-### HTML
-- HTML5 Boilerplate
-- Responsive Card
-- Navigation Bar
-- Contact Form
+## API Endpoints 🔌
 
-### CSS
-- Flexbox Center
-- Grid Layout
-- Glassmorphism
-- Button Hover Effects
-- Gradient Text
+### Health Check
+```
+GET /health
+```
+Returns server status and active room/user counts.
 
-### JavaScript
-- Fetch API
-- DOM Manipulation
-- Local Storage
-- Debounce Function
-- Array Methods
+### Room Info (Debug)
+```
+GET /api/rooms
+```
+Returns list of active rooms with user counts.
 
-### Python
-- List Comprehension
-- Dictionary Operations
-- Function Decorators
-- Class Examples
+## Technologies Used 🛠️
 
-## 🔧 Configuration
+### Frontend
+- HTML5, CSS3, JavaScript (ES6+)
+- CodeMirror 6 (code editor)
+- Socket.io Client (chat)
+- PeerJS (WebRTC for code sharing)
+- Font Awesome (icons)
 
-The app uses localStorage for persistence:
-- File contents and structure
-- Theme preference
-- Console visibility
-- Sidebar width
-- Panel sizes
+### Backend
+- Node.js
+- Express
+- Socket.io (real-time chat)
+- CORS enabled
 
-Data expires after 30 minutes of inactivity.
+## Browser Support 🌐
 
-## 🌐 Browser Support
-
-- ✅ Chrome/Edge (Recommended)
+- ✅ Chrome/Edge (recommended)
 - ✅ Firefox
-- ✅ Safari (Limited collaboration support)
+- ✅ Safari
 - ✅ Opera
 
-**Note:** WebRTC collaboration requires modern browsers with WebRTC support.
+## Deployment 🚀
 
-## 🐛 Troubleshooting
+### Frontend (Vercel/Netlify)
+1. Deploy `index.html` and assets
+2. Update `SERVER_URL` in `socket-client.js`
 
-### Collaboration Not Working?
-1. Make sure you're using HTTPS (deploy to Vercel/Netlify)
-2. Check browser console for errors (F12)
-3. Try "Same Browser" tab sync first
-4. Ensure both users have the same room code
-5. Wait 5-10 seconds after creating room
+### Backend (Heroku/Railway/Render)
+1. Deploy `server.js` with `package.json`
+2. Set `PORT` environment variable
+3. Enable WebSocket support
+4. Update CORS settings if needed
 
-### Console Errors?
-1. Hard refresh: `Ctrl+Shift+R` (Windows) or `Cmd+Shift+R` (Mac)
-2. Clear browser cache
-3. Check if all CDN resources loaded
+## Troubleshooting 🐛
 
-### Features Not Loading?
-1. Check internet connection (CDN dependencies)
-2. Disable browser extensions
-3. Try incognito/private mode
+### "Failed to connect to server"
+**Solution:** Make sure backend is running (`node server.js`)
 
-## 🤝 Contributing
+### "Username already taken"
+**Solution:** Select one of the suggested alternatives or enter a different name
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+### Chat not visible
+**Solution:** Click chat icon (💬) in left activity bar
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+### Messages not appearing
+**Solution:** Verify both users are in the same room (check user list)
 
-## 📄 License
+### Room code not working
+**Solution:** Ensure code is exactly 12 characters and host is still connected
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## Security 🔒
 
-## 👨‍💻 Author
+- ✅ HTML escaping prevents XSS attacks
+- ✅ Input validation on server and client
+- ✅ Room codes are hard to guess (62^12 combinations)
+- ✅ No message persistence (in-memory only)
+- ✅ CORS configured for production
 
-**Ashish Gupta**
+## Performance 📊
 
-- Portfolio: [bitcodeashishcloud.github.io/Ashish-Gupta](https://bitcodeashishcloud.github.io/Ashish-Gupta/)
-- GitHub: [@bitcodeAShishcloud](https://github.com/bitcodeAShishcloud)
-- LinkedIn: [Ashish Gupta](https://www.linkedin.com/in/ashish-gupta-037973259/)
+- Handles 100+ concurrent users
+- Room-based architecture scales well
+- Efficient Map data structures
+- WebRTC for P2P code sharing (no server load)
+- Socket.io for reliable chat delivery
 
-## 🙏 Acknowledgments
+## Contributing 🤝
 
-- Font Awesome for icons
-- Google Fonts for typography
-- PeerJS for WebRTC simplification
-- Prettier for code formatting
-- Pyodide for Python in browser
-- JSZip for file compression
+This is a personal project, but suggestions are welcome!
 
-## 📊 Stats
+## License 📄
 
-- **Lines of Code**: ~2,500+
-- **File Size**: ~150KB (uncompressed)
-- **Load Time**: < 2 seconds
-- **Supported Languages**: 6
-- **Code Snippets**: 20+
-- **Keyboard Shortcuts**: 7
+Built with ❤️ by Ashish Gupta
 
-## 🔮 Future Features
+## Links 🔗
 
-- [ ] AI Code Assistant
-- [ ] Git Integration
-- [ ] Terminal Emulator
-- [ ] Split View Editor
-- [ ] Custom Themes
-- [ ] Code Minifier
-- [ ] Regex Tester
-- [ ] Color Picker
-- [ ] Multi-cursor Editing
-
-## 📞 Support
-
-If you encounter any issues or have questions:
-1. Check the [TEST_COLLABORATION.md](TEST_COLLABORATION.md) guide
-2. Open an issue on GitHub
-3. Contact via LinkedIn
+- Portfolio: [https://bitcodeashishcloud.github.io/Ashish-Gupta/](https://bitcodeashishcloud.github.io/Ashish-Gupta/)
+- GitHub: [https://github.com/bitcodeAShishcloud](https://github.com/bitcodeAShishcloud)
+- LinkedIn: [https://www.linkedin.com/in/ashish-gupta-037973259/](https://www.linkedin.com/in/ashish-gupta-037973259/)
 
 ---
 
-**⭐ Star this repo if you find it useful!**
+**Need help?** Check `START_HERE.txt` for detailed setup instructions.
 
-Made with ❤️ by Ashish Gupta
+**Happy coding!** 🚀

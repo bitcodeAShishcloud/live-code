@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend Connection Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            margin-top: 20px;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: #6c757d;
+            margin-right: 8px;
+        }
+
+        .log-success {
+            color: #28a745;
+        }
+
+        .log-error {
+            color: #dc3545;
+        }
+
+        .log-info {
+            color: #17a2b8;
+        }
+
+        .tests {
+            margin-top: 20px;
+        }
+
+        .test-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .test-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 12px;
+            font-size: 1.2rem;
+        }
+
+        .test-pending {
+            color: #6c757d;
+        }
+
+        .test-running {
+            color: #ffc107;
+        }
+
+        .test-success {
+            color: #28a745;
+        }
+
+        .test-error {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Backend Connection Test</h1>
+        <p class="subtitle">Test your Socket.io backend connection and room isolation</p>
+
+        <div id="status" class="status"></div>
+
+        <div class="input-group">
+            <label for="serverUrl">Backend Server URL</label>
+            <input type="text" id="serverUrl" value="http://localhost:3000" placeholder="http://localhost:3000">
+        </div>
+
+        <button onclick="testConnection()">Test Connection</button>
+        <button onclick="testRoomIsolation()">Test Room Isolation</button>
+        <button onclick="clearLog()">Clear Log</button>
+
+        <div class="tests" id="tests" style="display: none;">
+            <h3 style="margin-bottom: 12px; color: #333;">Test Results:</h3>
+            <div class="test-item">
+                <span class="test-icon test-pending" id="test1-icon">⏳</span>
+                <span id="test1-text">Server Connection</span>
+            </div>
+            <div class="test-item">
+                <span class="test-icon test-pending" id="test2-icon">⏳</span>
+                <span id="test2-text">Authentication</span>
+            </div>
+            <div class="test-item">
+                <span class="test-icon test-pending" id="test3-icon">⏳</span>
+                <span id="test3-text">Chat Message</span>
+            </div>
+            <div class="test-item">
+                <span class="test-icon test-pending" id="test4-icon">⏳</span>
+                <span id="test4-text">Room Isolation</span>
+            </div>
+        </div>
+
+        <div class="log" id="log"></div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <script>
+        let socket = null;
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type} show`;
+        }
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${time}]</span><span class="log-${type}">${message}</span>`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('tests').style.display = 'none';
+            showStatus('Log cleared', 'info');
+            setTimeout(() => {
+                document.getElementById('status').classList.remove('show');
+            }, 2000);
+        }
+
+        function updateTest(testNum, status, text) {
+            const icon = document.getElementById(`test${testNum}-icon`);
+            const textEl = document.getElementById(`test${testNum}-text`);
+            
+            icon.className = `test-icon test-${status}`;
+            
+            if (status === 'running') {
+                icon.textContent = '⏳';
+            } else if (status === 'success') {
+                icon.textContent = '✅';
+            } else if (status === 'error') {
+                icon.textContent = '❌';
+            }
+            
+            if (text) {
+                textEl.textContent = text;
+            }
+        }
+
+        async function testConnection() {
+            const serverUrl = document.getElementById('serverUrl').value.trim();
+            
+            if (!serverUrl) {
+                showStatus('Please enter a server URL', 'error');
+                return;
+            }
+
+            document.getElementById('tests').style.display = 'block';
+            
+            // Reset tests
+            for (let i = 1; i <= 4; i++) {
+                updateTest(i, 'pending', null);
+            }
+
+            addLog('Starting connection test...', 'info');
+            showStatus('Testing connection...', 'info');
+
+            // Test 1: Connection
+            updateTest(1, 'running', 'Connecting to server...');
+            
+            try {
+                socket = io(serverUrl, {
+                    transports: ['websocket', 'polling'],
+                    reconnection: false
+                });
+
+                socket.on('connect', () => {
+                    updateTest(1, 'success', 'Server Connection ✓');
+                    addLog(`Connected to ${serverUrl}`, 'success');
+                    
+                    // Test 2: Authentication
+                    updateTest(2, 'running', 'Authenticating...');
+                    const testUsername = 'TestUser' + Math.floor(Math.random() * 1000);
+                    const testRoomCode = 'TEST12345678';
+                    
+                    socket.emit('authenticate', {
+                        username: testUsername,
+                        roomCode: testRoomCode
+                    });
+                });
+
+                socket.on('authenticated', ({ success, roomCode, username }) => {
+                    if (success) {
+                        updateTest(2, 'success', 'Authentication ✓');
+                        addLog(`Authenticated as ${username} in room ${roomCode}`, 'success');
+                        
+                        // Test 3: Chat Message
+                        updateTest(3, 'running', 'Sending test message...');
+                        socket.emit('chat-message', { message: 'Test message' });
+                    } else {
+                        updateTest(2, 'error', 'Authentication Failed');
+                        addLog('Authentication failed', 'error');
+                    }
+                });
+
+                socket.on('chat-message', ({ username, message }) => {
+                    updateTest(3, 'success', 'Chat Message ✓');
+                    addLog(`Received message from ${username}: ${message}`, 'success');
+                    
+                    // All tests passed
+                    showStatus('✅ All tests passed! Backend is working correctly.', 'success');
+                    
+                    // Disconnect
+                    setTimeout(() => {
+                        socket.disconnect();
+                        addLog('Disconnected from server', 'info');
+                    }, 1000);
+                });
+
+                socket.on('connect_error', (error) => {
+                    updateTest(1, 'error', 'Connection Failed');
+                    addLog(`Connection error: ${error.message}`, 'error');
+                    showStatus('❌ Connection failed. Make sure the backend is running.', 'error');
+                });
+
+                socket.on('error', ({ message }) => {
+                    addLog(`Server error: ${message}`, 'error');
+                    showStatus(`❌ Error: ${message}`, 'error');
+                });
+
+            } catch (error) {
+                updateTest(1, 'error', 'Connection Failed');
+                addLog(`Error: ${error.message}`, 'error');
+                showStatus('❌ Connection failed', 'error');
+            }
+        }
+
+        async function testRoomIsolation() {
+            const serverUrl = document.getElementById('serverUrl').value.trim();
+            
+            if (!serverUrl) {
+                showStatus('Please enter a server URL', 'error');
+                return;
+            }
+
+            document.getElementById('tests').style.display = 'block';
+            updateTest(4, 'running', 'Testing room isolation...');
+            
+            addLog('Starting room isolation test...', 'info');
+            showStatus('Testing room isolation...', 'info');
+
+            // Create two connections in different rooms
+            const socket1 = io(serverUrl, { transports: ['websocket', 'polling'] });
+            const socket2 = io(serverUrl, { transports: ['websocket', 'polling'] });
+
+            let socket1Connected = false;
+            let socket2Connected = false;
+            let socket1MessageReceived = false;
+            let socket2MessageReceived = false;
+
+            socket1.on('connect', () => {
+                socket1Connected = true;
+                addLog('Socket 1 connected', 'info');
+                socket1.emit('authenticate', {
+                    username: 'User1',
+                    roomCode: 'ROOM1AAAAAAA'
+                });
+            });
+
+            socket2.on('connect', () => {
+                socket2Connected = true;
+                addLog('Socket 2 connected', 'info');
+                socket2.emit('authenticate', {
+                    username: 'User2',
+                    roomCode: 'ROOM2BBBBBBB'
+                });
+            });
+
+            socket1.on('authenticated', () => {
+                addLog('Socket 1 authenticated in ROOM1AAAAAAA', 'success');
+                // Send message from socket1
+                socket1.emit('chat-message', { message: 'Message from Room 1' });
+            });
+
+            socket2.on('authenticated', () => {
+                addLog('Socket 2 authenticated in ROOM2BBBBBBB', 'success');
+            });
+
+            socket1.on('chat-message', ({ username, message }) => {
+                socket1MessageReceived = true;
+                addLog(`Socket 1 received: ${message}`, 'info');
+            });
+
+            socket2.on('chat-message', ({ username, message }) => {
+                socket2MessageReceived = true;
+                addLog(`Socket 2 received: ${message} (SHOULD NOT HAPPEN!)`, 'error');
+            });
+
+            // Check results after 3 seconds
+            setTimeout(() => {
+                if (socket1MessageReceived && !socket2MessageReceived) {
+                    updateTest(4, 'success', 'Room Isolation ✓');
+                    addLog('✅ Room isolation working correctly!', 'success');
+                    showStatus('✅ Room isolation test passed!', 'success');
+                } else if (socket2MessageReceived) {
+                    updateTest(4, 'error', 'Room Isolation Failed');
+                    addLog('❌ Room isolation FAILED - messages leaked between rooms!', 'error');
+                    showStatus('❌ Room isolation failed!', 'error');
+                } else {
+                    updateTest(4, 'error', 'Test Incomplete');
+                    addLog('⚠️ Test incomplete - no messages received', 'error');
+                    showStatus('⚠️ Test incomplete', 'error');
+                }
+
+                // Cleanup
+                socket1.disconnect();
+                socket2.disconnect();
+                addLog('Test completed, sockets disconnected', 'info');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
