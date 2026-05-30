@@ -1,232 +1,97 @@
-# Live Compiler Pro 🚀
+# Live Compiler Pro — Real-time Chat & Voice Backend
 
-A powerful live code editor with real-time collaboration and integrated chat.
+A Python (Flask-SocketIO) backend that powers the in-app **Chat** panel and
+relays **WebRTC** voice signaling. Rooms are fully isolated: messages and calls
+in one room never reach another.
 
-## Features ✨
+## What you get
 
-### Code Editor
-- 🎨 Multi-language support (HTML, CSS, JavaScript, Python, JSON, Markdown)
-- 🔄 Live preview with auto-refresh
-- 💻 CodeMirror 6 integration
-- 🎯 Syntax highlighting
-- 📝 Code formatting (Prettier)
-- 🌓 Dark/Light theme
+- **Sidebar chat** — open it from the chat icon (💬) in the activity bar.
+- **Room isolation** — users only see messages/calls from their own room code.
+- **Unread badge** — a red counter on the chat icon when the panel is closed.
+- **Browser notifications** — desktop alerts for messages from other users.
+- **Presence** — live list of who is in the room.
+- **WebRTC signaling** — offer/answer/ICE relayed only between peers in the same room.
 
-### Live Collaboration
-- 👥 Real-time code sharing via WebRTC (P2P)
-- 🔒 Room-based isolation with 12-character codes
-- 🔄 Automatic synchronization
-- 💬 **Integrated chat** - automatically connects when joining collaboration
+## Project layout
 
-### Chat System
-- 💬 Real-time messaging via Socket.io
-- 🔔 Notification badges for new messages
-- 👤 Username uniqueness with smart suggestions
-- 🔒 Room isolation - messages never cross rooms
-- 📱 Browser notifications support
-- 👥 Online user list
-- ⚡ Auto-connects with collaboration rooms
+| File | Purpose |
+|------|---------|
+| `server.py` | Flask-SocketIO backend (chat, presence, WebRTC relay) |
+| `requirements.txt` | Python dependencies |
+| `socket-client.js` | Frontend Socket.IO client + chat UI logic |
+| `index.html` / `styles.css` / `script.js` | The existing app, with the chat panel integrated |
+| `test-connection.html` | Standalone page to smoke-test the backend |
 
-### Additional Features
-- 📦 Import/Export files
-- 🗂️ Multiple file management
-- 📱 Responsive design
-- 🎨 Code snippets library
-- 🔍 Console with JavaScript execution
+## Run locally
 
-## Quick Start 🚀
+1. Create / activate a virtual environment (one already exists in `.venv`):
 
-### 1. Install Dependencies
-```bash
-npm install
-```
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate        # Windows
+   # source .venv/bin/activate   # macOS / Linux
+   ```
 
-### 2. Start Backend Server
-```bash
-node server.js
-```
+2. Install dependencies:
 
-You should see:
-```
-============================================================
-🚀 Server running on http://localhost:3000
-📡 Socket.io server ready for connections
-🔒 Room isolation enabled
-💬 Chat and WebRTC signaling active
-============================================================
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### 3. Open Application
-Open `index.html` in your browser or deploy to your hosting platform.
+3. Start the server:
 
-## How to Use Chat 💬
+   ```bash
+   python server.py
+   ```
 
-### Method 1: Via Live Collaboration (Recommended)
+   You should see `Listening on http://localhost:3000`.
 
-1. Click **"Collab"** button in header
-2. Click **"Create New Room"** or **"Join Room"**
-3. Enter your **username** when prompted
-4. ✅ Chat connects automatically!
-5. ✅ Chat panel opens automatically!
-6. Start coding and chatting together!
+4. Open the app at **http://localhost:3000** (the backend serves `index.html`),
+   click the chat icon, enter a username, and create or join a room.
 
-### Method 2: Via Chat Panel Directly
+### Quick test
 
-1. Click **chat icon (💬)** in left activity bar
-2. Enter your **username**
-3. Enter **room code** (or click "Create" to generate one)
-4. Click **"Join"** or **"Create"**
-5. Start chatting!
+Open two browser windows on `http://localhost:3000`:
 
-## Username Uniqueness 👤
+1. Window 1 → chat icon → enter "Alice" → **Create**. Copy the room code.
+2. Window 2 → chat icon → enter "Bob" → paste the code → **Join**.
+3. Chat between them. Open a third window in a *different* room to confirm
+   messages stay isolated.
 
-The system enforces unique usernames per room:
+You can also open `test-connection.html` directly for an automated check.
 
-- If you try to use a taken username, you'll get **3 smart suggestions**
-- Examples: `Alice2`, `SwiftAlice`, `AlicePro`
-- One-click to auto-select or enter a custom name
-- Case-insensitive matching (Alice = alice = ALICE)
+## Configuration
 
-## Room Isolation 🔒
+Environment variables (all optional):
 
-- Each room has a unique **12-character code**
-- Messages and code sync are **completely isolated**
-- Same username can exist in different rooms
-- Rooms exist as long as the host is connected
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | Port to listen on |
+| `HOST` | `0.0.0.0` | Bind address |
+| `CORS_ORIGINS` | `*` | Allowed origins (set to your frontend URL in production) |
 
-## Project Structure 📁
+The frontend points at `http://localhost:3000` via the `SERVER_URL` constant at
+the top of `socket-client.js`. Change it to your deployed backend URL for
+production.
 
-```
-├── index.html              # Main application
-├── styles.css              # All styles (including chat)
-├── script.js               # Main app logic + chat helpers
-├── server.js               # Backend server (Socket.io)
-├── socket-client.js        # Chat client integration
-├── package.json            # Dependencies
-├── .env.example            # Environment variables template
-├── .gitignore              # Git ignore rules
-└── README.md               # This file
-```
+## HTTP endpoints
 
-## Configuration ⚙️
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Status plus active room/user counts |
+| `GET /api/rooms` | Debug: list active rooms and their members |
 
-### Backend Server URL
-Default: `http://localhost:3000`
+## Deploying
 
-To change for production:
-1. Edit `socket-client.js`
-2. Update `SERVER_URL` constant
-3. Deploy backend to your server
+Vercel serverless functions don't keep WebSocket connections open, so deploy the
+backend to a host that supports long-lived processes:
 
-### Port Configuration
-Default: `3000`
+- **Render**, **Railway**, **Fly.io**, or any VPS.
+- Start command: `python server.py` (or run under `gunicorn` with an async worker).
+- Set `CORS_ORIGINS` to your frontend origin and update `SERVER_URL` in
+  `socket-client.js` to the deployed URL.
 
-To change:
-```bash
-# Via environment variable
-PORT=8080 node server.js
-
-# Or edit server.js
-const PORT = process.env.PORT || 3000;
-```
-
-## API Endpoints 🔌
-
-### Health Check
-```
-GET /health
-```
-Returns server status and active room/user counts.
-
-### Room Info (Debug)
-```
-GET /api/rooms
-```
-Returns list of active rooms with user counts.
-
-## Technologies Used 🛠️
-
-### Frontend
-- HTML5, CSS3, JavaScript (ES6+)
-- CodeMirror 6 (code editor)
-- Socket.io Client (chat)
-- PeerJS (WebRTC for code sharing)
-- Font Awesome (icons)
-
-### Backend
-- Node.js
-- Express
-- Socket.io (real-time chat)
-- CORS enabled
-
-## Browser Support 🌐
-
-- ✅ Chrome/Edge (recommended)
-- ✅ Firefox
-- ✅ Safari
-- ✅ Opera
-
-## Deployment 🚀
-
-### Frontend (Vercel/Netlify)
-1. Deploy `index.html` and assets
-2. Update `SERVER_URL` in `socket-client.js`
-
-### Backend (Heroku/Railway/Render)
-1. Deploy `server.js` with `package.json`
-2. Set `PORT` environment variable
-3. Enable WebSocket support
-4. Update CORS settings if needed
-
-## Troubleshooting 🐛
-
-### "Failed to connect to server"
-**Solution:** Make sure backend is running (`node server.js`)
-
-### "Username already taken"
-**Solution:** Select one of the suggested alternatives or enter a different name
-
-### Chat not visible
-**Solution:** Click chat icon (💬) in left activity bar
-
-### Messages not appearing
-**Solution:** Verify both users are in the same room (check user list)
-
-### Room code not working
-**Solution:** Ensure code is exactly 12 characters and host is still connected
-
-## Security 🔒
-
-- ✅ HTML escaping prevents XSS attacks
-- ✅ Input validation on server and client
-- ✅ Room codes are hard to guess (62^12 combinations)
-- ✅ No message persistence (in-memory only)
-- ✅ CORS configured for production
-
-## Performance 📊
-
-- Handles 100+ concurrent users
-- Room-based architecture scales well
-- Efficient Map data structures
-- WebRTC for P2P code sharing (no server load)
-- Socket.io for reliable chat delivery
-
-## Contributing 🤝
-
-This is a personal project, but suggestions are welcome!
-
-## License 📄
-
-Built with ❤️ by Ashish Gupta
-
-## Links 🔗
-
-- Portfolio: [https://bitcodeashishcloud.github.io/Ashish-Gupta/](https://bitcodeashishcloud.github.io/Ashish-Gupta/)
-- GitHub: [https://github.com/bitcodeAShishcloud](https://github.com/bitcodeAShishcloud)
-- LinkedIn: [https://www.linkedin.com/in/ashish-gupta-037973259/](https://www.linkedin.com/in/ashish-gupta-037973259/)
-
----
-
-**Need help?** Check `START_HERE.txt` for detailed setup instructions.
-
-**Happy coding!** 🚀
+> The built-in server is fine for development and small groups. For heavier
+> production traffic, run behind `gunicorn`/`uvicorn` with multiple workers and a
+> shared message queue (e.g. Redis) so Socket.IO can scale horizontally.
