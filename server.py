@@ -196,9 +196,15 @@ socketio = SocketIO(
     # "threading" mode works out of the box on modern Python (3.12/3.13) and
     # uses simple-websocket for the WebSocket transport. No monkey-patching.
     async_mode="threading",
+    # Allow larger payloads so compressed images (data URLs) can pass through.
+    max_http_buffer_size=8 * 1024 * 1024,  # 8 MB
     logger=False,
     engineio_logger=False,
 )
+
+# Hard cap for a single image payload (server-side guard). Clients are expected
+# to compress images well below this; anything larger is rejected.
+MAX_IMAGE_BYTES = 3 * 1024 * 1024  # 3 MB
 
 
 # --------------------------------------------------------------------------- #
@@ -342,6 +348,45 @@ def on_chat_message(data: dict):
         "timestamp": now_iso(),
         "socketId": user.sid,
     }, room=user.room_code)  # include_self=True (default) so sender sees it too
+
+
+@socketio.on("chat-image")
+def on_chat_image(data: dict):
+    """Relay an image (sent as a base64 data URL) to everyone in the room."""
+    from flask import request
+
+    try:
+        user = registry.get_user(request.sid)
+        if user is None:
+            emit("error", {"message": "You must join a room before sharing images."})
+            return
+
+        image = (data or {}).get("image", "")
+        caption = (data or {}).get("caption", "").strip()
+        name = (data or {}).get("name", "image")
+
+        # Basic validation: must be an image data URL within the size cap.
+        if not isinstance(image, str) or not image.startswith("data:image/"):
+            emit("error", {"message": "Invalid image."})
+            return
+        if len(image) > MAX_IMAGE_BYTES:
+            emit("error", {"message": "Image is too large. Please use a smaller image."})
+            return
+
+        log.info('[%s] %s shared an image (%s, %d bytes)',
+                 user.room_code, user.username, name, len(image))
+
+        emit("chat-image", {
+            "username": user.username,
+            "image": image,
+            "caption": caption,
+            "name": name,
+            "timestamp": now_iso(),
+            "socketId": user.sid,
+        }, room=user.room_code)
+    except Exception as exc:  # noqa: BLE001 - log unexpected handler failures
+        log.exception("chat-image handler failed: %s", exc)
+        emit("error", {"message": "Failed to share image."})
 
 
 # -- WebRTC signaling relay ------------------------------------------------- #

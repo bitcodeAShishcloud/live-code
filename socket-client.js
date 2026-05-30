@@ -141,7 +141,11 @@
     function restoreMessages() {
         const saved = loadMessages();
         for (const m of saved) {
-            addMessage(m.username, m.message, m.type, m.timestamp, true);
+            if (m.kind === "image") {
+                addImageMessage(m.username, m.image, m.caption, m.type, m.timestamp, true);
+            } else {
+                addMessage(m.username, m.message, m.type, m.timestamp, true);
+            }
         }
     }
 
@@ -303,6 +307,11 @@
             addMessage(username, message, mine ? "self" : "other", timestamp);
         });
 
+        socket.on("chat-image", ({ username, image, caption, timestamp, socketId }) => {
+            const mine = socket && socketId === socket.id;
+            addImageMessage(username, image, caption, mine ? "self" : "other", timestamp);
+        });
+
         // ---- WebRTC signaling -------------------------------------------- //
         socket.on("webrtc-offer", async ({ offer, fromSocketId }) => {
             await handleOffer(offer, fromSocketId);
@@ -367,6 +376,66 @@
         }
         socket.emit("chat-message", { message: text });
         return true;
+    }
+
+    // Compress + downscale an image file, then send it as a data URL.
+    function sendImageFile(file) {
+        if (!file || !file.type.startsWith("image/")) {
+            if (typeof showToast === "function") showToast("Please choose an image file", "error");
+            return;
+        }
+        if (!socket || !socket.connected || !currentRoomCode) {
+            setStatus("Join a room before sending images.", "disconnected");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                // Downscale so the longest side is at most 1280px.
+                const MAX = 1280;
+                let { width, height } = img;
+                if (width > MAX || height > MAX) {
+                    if (width >= height) {
+                        height = Math.round((height * MAX) / width);
+                        width = MAX;
+                    } else {
+                        width = Math.round((width * MAX) / height);
+                        height = MAX;
+                    }
+                }
+                const canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // JPEG keeps the payload small; PNGs with transparency lose it,
+                // which is an acceptable tradeoff for a chat preview.
+                let dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+
+                // If still too big, drop quality further.
+                if (dataUrl.length > 2_500_000) {
+                    dataUrl = canvas.toDataURL("image/jpeg", 0.6);
+                }
+                if (dataUrl.length > 2_900_000) {
+                    if (typeof showToast === "function")
+                        showToast("Image is too large to send", "error");
+                    return;
+                }
+
+                socket.emit("chat-image", { image: dataUrl, name: file.name });
+            };
+            img.onerror = () => {
+                if (typeof showToast === "function") showToast("Could not read image", "error");
+            };
+            img.src = e.target.result;
+        };
+        reader.onerror = () => {
+            if (typeof showToast === "function") showToast("Could not read file", "error");
+        };
+        reader.readAsDataURL(file);
     }
 
     function sendCodeChange(fileId, content) {
@@ -464,6 +533,58 @@
             renderBadge();
             maybeBrowserNotify(username, message);
         }
+    }
+
+    // Render an image message (data URL) as a clickable thumbnail.
+    function addImageMessage(username, image, caption, type, timestamp, skipPersist) {
+        const box = $("chatMessages");
+        if (!box || !image) return;
+
+        const ts = timestamp || new Date().toISOString();
+        const time = new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+        const wrap = document.createElement("div");
+        wrap.className = `chat-message ${type}`;
+        wrap.innerHTML = `
+            <div class="message-header">
+                <span class="message-username">${escapeHtml(username)}</span>
+                <span class="message-time">${time}</span>
+            </div>
+            <div class="message-content">
+                <img class="chat-image" alt="shared image" />
+                ${caption ? `<span class="message-text">${escapeHtml(caption)}</span>` : ""}
+            </div>`;
+
+        const imgEl = wrap.querySelector("img.chat-image");
+        imgEl.src = image;
+        // Click to open full size in a new tab.
+        imgEl.addEventListener("click", () => openImageViewer(image));
+
+        box.appendChild(wrap);
+        box.scrollTop = box.scrollHeight;
+
+        if (!skipPersist && (type === "self" || type === "other")) {
+            persistMessage({ username, image, caption, type, kind: "image", timestamp: ts });
+        }
+
+        if (type === "other" && !skipPersist && !isChatPanelOpen()) {
+            unreadCount += 1;
+            renderBadge();
+            maybeBrowserNotify(username, "📷 sent an image");
+        }
+    }
+
+    // Lightweight fullscreen image viewer (click outside / Esc to close).
+    function openImageViewer(src) {
+        const overlay = document.createElement("div");
+        overlay.className = "image-viewer-overlay";
+        overlay.innerHTML = `<img src="${src}" alt="full image" />`;
+        const close = () => overlay.remove();
+        overlay.addEventListener("click", close);
+        document.addEventListener("keydown", function esc(e) {
+            if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); }
+        });
+        document.body.appendChild(overlay);
     }
 
     function renderUsers(users) {
@@ -669,6 +790,13 @@
     window.handleChatSend = function () {
         const input = $("chatMessageInput");
         if (input && sendMessage(input.value)) input.value = "";
+    };
+
+    window.handleChatImagePick = function (event) {
+        const file = event && event.target && event.target.files && event.target.files[0];
+        if (file) sendImageFile(file);
+        // Reset so picking the same file again still fires change.
+        if (event && event.target) event.target.value = "";
     };
 
     window.handleChatInputKeyPress = function (event) {
