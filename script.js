@@ -2848,6 +2848,9 @@ let roomCode = null;
 let isCollabConnected = false;
 let peer = null;
 let conn = null;
+// True while the user is intentionally leaving, so PeerJS close/disconnect
+// events do not trigger an automatic reconnect.
+let isLeavingCollab = false;
 
 function openCollabModal() {
     const modal = document.getElementById('collabModal');
@@ -3040,6 +3043,10 @@ function setCollabConnectedView(isConnected, opts = {}) {
 }
 
 function attemptReconnect() {
+    // Don't reconnect if the user intentionally left.
+    if (isLeavingCollab) {
+        return;
+    }
     const session = getCollabSession();
     if (!session || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         showCollabStatus('webrtc', '❌ Reconnection failed. Please create/join room again.', 'error');
@@ -3158,25 +3165,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Ensure the PeerJS library is available, loading it on demand. Returns a
+// promise that resolves once `Peer` is ready (or rejects on failure).
+function ensurePeerJsLoaded() {
+    if (typeof Peer !== 'undefined') {
+        return Promise.resolve();
+    }
+    return loadPeerJS();
+}
+
 function createCollabRoom(existingCode = null, knownUsername = null) {
-    // Check if PeerJS is loaded
-    if (typeof Peer === 'undefined') {
-        showCollabStatus('webrtc', 'Loading PeerJS library... Please wait.', 'info');
-        loadPeerJS().then(() => {
-            showCollabStatus('webrtc', 'PeerJS loaded! Click Create Room again.', 'success');
-        }).catch(err => {
-            showCollabStatus('webrtc', 'Failed to load PeerJS. Please refresh the page.', 'error');
-            console.error('PeerJS load error:', err);
-        });
-        return;
-    }
-
-    // Use the stored username on reconnect, otherwise ask via custom modal.
+    // On reconnect we already have the username — skip the prompt.
     if (knownUsername && knownUsername.trim()) {
-        startCollabRoom(existingCode, knownUsername.trim());
+        const name = knownUsername.trim();
+        showCollabStatus('webrtc', '🔄 Connecting...', 'info');
+        ensurePeerJsLoaded()
+            .then(() => startCollabRoom(existingCode, name))
+            .catch(() => showCollabStatus('webrtc', '❌ Could not load collaboration library. Check your connection.', 'error'));
         return;
     }
 
+    // Ask for a username first (works even before PeerJS finishes loading).
     askUsername({
         title: 'Create a room',
         subtitle: 'Pick a username others will see'
@@ -3185,11 +3194,15 @@ function createCollabRoom(existingCode = null, knownUsername = null) {
             showCollabStatus('webrtc', 'Username is required to create a room', 'error');
             return;
         }
-        startCollabRoom(existingCode, username);
+        showCollabStatus('webrtc', '🔄 Creating room...', 'info');
+        return ensurePeerJsLoaded()
+            .then(() => startCollabRoom(existingCode, username))
+            .catch(() => showCollabStatus('webrtc', '❌ Could not load collaboration library. Check your connection.', 'error'));
     });
 }
 
 function startCollabRoom(existingCode, username) {
+    isLeavingCollab = false;
     try {
         roomCode = existingCode || generateRoomCode();
         
@@ -3242,18 +3255,6 @@ function startCollabRoom(existingCode, username) {
 }
 
 function joinCollabRoom(knownUsername = null) {
-    // Check if PeerJS is loaded
-    if (typeof Peer === 'undefined') {
-        showCollabStatus('webrtc', 'Loading PeerJS library... Please wait.', 'info');
-        loadPeerJS().then(() => {
-            showCollabStatus('webrtc', 'PeerJS loaded! Try joining again.', 'success');
-        }).catch(err => {
-            showCollabStatus('webrtc', 'Failed to load PeerJS. Please refresh the page.', 'error');
-            console.error('PeerJS load error:', err);
-        });
-        return;
-    }
-    
     const codeInput = document.getElementById('joinRoomCode');
     if (!codeInput) {
         console.error('Join room code input not found');
@@ -3269,7 +3270,11 @@ function joinCollabRoom(knownUsername = null) {
 
     // Use the stored username on reconnect, otherwise ask via custom modal.
     if (knownUsername && knownUsername.trim()) {
-        startJoinRoom(code, knownUsername.trim());
+        const name = knownUsername.trim();
+        showCollabStatus('webrtc', '🔄 Connecting...', 'info');
+        ensurePeerJsLoaded()
+            .then(() => startJoinRoom(code, name))
+            .catch(() => showCollabStatus('webrtc', '❌ Could not load collaboration library. Check your connection.', 'error'));
         return;
     }
 
@@ -3281,11 +3286,15 @@ function joinCollabRoom(knownUsername = null) {
             showCollabStatus('webrtc', 'Username is required to join a room', 'error');
             return;
         }
-        startJoinRoom(code, username);
+        showCollabStatus('webrtc', '🔄 Joining room...', 'info');
+        return ensurePeerJsLoaded()
+            .then(() => startJoinRoom(code, username))
+            .catch(() => showCollabStatus('webrtc', '❌ Could not load collaboration library. Check your connection.', 'error'));
     });
 }
 
 function startJoinRoom(code, username) {
+    isLeavingCollab = false;
     try {
         // Create peer and connect to room
         peer = new Peer({
@@ -3335,17 +3344,28 @@ function startJoinRoom(code, username) {
 }
 
 function disconnectCollab() {
+    // Mark this as an intentional leave so event handlers below don't reconnect.
+    isLeavingCollab = true;
+
     if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
     }
     
     if (conn) {
+        try { conn.off(); } catch (e) {}
         conn.close();
         conn = null;
     }
     
     if (peer) {
+        // Remove all listeners first so destroy() doesn't trigger reconnect.
+        try {
+            peer.off('disconnected');
+            peer.off('close');
+            peer.off('error');
+            peer.off('connection');
+        } catch (e) {}
         peer.destroy();
         peer = null;
     }
@@ -3364,6 +3384,9 @@ function disconnectCollab() {
     setCollabConnectedView(false);
     
     showCollabStatus('webrtc', 'You left the session.', 'info');
+
+    // Allow future reconnects again after cleanup settles.
+    setTimeout(() => { isLeavingCollab = false; }, 1500);
 }
 
 function manualReconnect() {
