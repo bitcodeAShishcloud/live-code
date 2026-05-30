@@ -529,74 +529,154 @@
     <!-- Collaboration Modal -->
     <div class="modal-overlay" id="collabModal">
         <div class="modal collab-modal">
-            <div class="modal-header">
-                <h3><i class="fas fa-users"></i> Live Collaboration</h3>
-                <button class="icon-btn" type="button" aria-label="Close collaboration modal" onclick="closeCollabModal()">
+            <div class="collab-head">
+                <div class="collab-head-left">
+                    <span class="collab-head-icon"><i class="fas fa-users"></i></span>
+                    <div class="collab-head-text">
+                        <h3>Live Collaboration</h3>
+                        <p>Code together in real-time</p>
+                    </div>
+                </div>
+                <button class="collab-close" type="button" aria-label="Close collaboration modal" onclick="closeCollabModal()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
+
             <div class="collab-content">
-                <div class="collab-tabs">
-                    <button class="collab-tab active" onclick="switchCollabTab('webrtc')">WebRTC (P2P)</button>
-                    <button class="collab-tab" onclick="switchCollabTab('broadcast')">Same Browser</button>
+                <div class="collab-tabs" role="tablist">
+                    <button class="collab-tab active" role="tab" onclick="switchCollabTab('webrtc')">
+                        <i class="fas fa-globe"></i> <span>Anywhere (P2P)</span>
+                    </button>
+                    <button class="collab-tab" role="tab" onclick="switchCollabTab('broadcast')">
+                        <i class="fas fa-window-restore"></i> <span>Same Browser</span>
+                    </button>
                 </div>
-                
+
+                <!-- ============ WebRTC / P2P panel ============ -->
                 <div class="collab-panel active" id="webrtcPanel">
-                    <p class="collab-info">Share code in real-time with anyone, anywhere. No server needed!</p>
-                    
-                    <div class="collab-section">
-                        <h4><i class="fas fa-plus-circle"></i> Create Room</h4>
-                        <button class="btn btn-primary" onclick="createCollabRoom()">
-                            <i class="fas fa-door-open"></i> Create New Room
-                        </button>
-                        <div id="roomCodeDisplay" class="room-code" style="display:none;">
-                            <label>Share this code:</label>
-                            <div class="room-code-box">
-                                <span id="roomCode"></span>
-                                <button class="btn-icon" onclick="copyRoomCode()" title="Copy">
-                                    <i class="fas fa-copy"></i>
+
+                    <!-- ---- SETUP VIEW (shown when not connected) ---- -->
+                    <div id="collabSetupView">
+                        <div class="collab-card create-card">
+                            <div class="collab-card-head">
+                                <span class="collab-card-icon"><i class="fas fa-circle-plus"></i></span>
+                                <div>
+                                    <h4>Create a room</h4>
+                                    <span class="collab-card-sub">You'll join it automatically</span>
+                                </div>
+                            </div>
+                            <button class="collab-btn collab-btn-primary" onclick="createCollabRoom()">
+                                <i class="fas fa-door-open"></i> Create &amp; Join Room
+                            </button>
+                        </div>
+
+                        <div class="collab-divider"><span>or</span></div>
+
+                        <div class="collab-card join-card">
+                            <div class="collab-card-head">
+                                <span class="collab-card-icon"><i class="fas fa-right-to-bracket"></i></span>
+                                <div>
+                                    <h4>Join a room</h4>
+                                    <span class="collab-card-sub">Enter a 12-character code</span>
+                                </div>
+                            </div>
+                            <div class="join-row">
+                                <input type="text" id="joinRoomCode" placeholder="e.g. C9CK1KP0C078" maxlength="12" autocomplete="off" spellcheck="false">
+                                <button class="collab-btn collab-btn-ghost" onclick="joinCollabRoom()">
+                                    <i class="fas fa-link"></i> Join
                                 </button>
                             </div>
                         </div>
+
+                        <div id="collabStatus" class="collab-status"></div>
+
+                        <div class="collab-steps">
+                            <span class="collab-steps-title"><i class="fas fa-circle-info"></i> How it works</span>
+                            <ol>
+                                <li><span class="step-num">1</span> Click <strong>Create &amp; Join Room</strong></li>
+                                <li><span class="step-num">2</span> Share the code that appears</li>
+                                <li><span class="step-num">3</span> Others paste it and click <strong>Join</strong></li>
+                                <li><span class="step-num">4</span> Start coding together in real-time</li>
+                            </ol>
+                        </div>
                     </div>
-                    
-                    <div class="collab-section">
-                        <h4><i class="fas fa-sign-in-alt"></i> Join Room</h4>
-                        <input type="text" id="joinRoomCode" placeholder="Enter room code (12 characters)" maxlength="12">
-                        <button class="btn btn-secondary" onclick="joinCollabRoom()">
-                            <i class="fas fa-link"></i> Join Room
-                        </button>
-                    </div>
-                    
-                    <div id="collabStatus" class="collab-status"></div>
-                    
-                    <div class="collab-section" id="collabActions" style="display:none; margin-top: 12px;">
-                        <button class="btn btn-warning" onclick="disconnectCollab()" style="margin-right: 8px;">
-                            <i class="fas fa-sign-out-alt"></i> Disconnect
-                        </button>
-                        <button class="btn btn-secondary" onclick="manualReconnect()">
-                            <i class="fas fa-redo"></i> Reconnect
-                        </button>
-                    </div>
-                    
-                    <div class="collab-section" style="margin-top: 12px;">
-                        <h4><i class="fas fa-info-circle"></i> How to Use</h4>
-                        <ol style="margin: 8px 0 0 20px; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6;">
-                            <li>Person 1: Click "Create New Room"</li>
-                            <li>Copy and share the 12-character code</li>
-                            <li>Person 2: Enter the code and click "Join Room"</li>
-                            <li>Start coding together!</li>
-                        </ol>
+
+                    <!-- ---- CONNECTED VIEW (shown when in a room) ---- -->
+                    <div id="collabConnectedView" style="display:none;">
+                        <div class="collab-live-card">
+                            <div class="collab-live-top">
+                                <span class="collab-live-badge">
+                                    <span class="collab-live-dot"></span> Connected
+                                </span>
+                                <span class="collab-live-role" id="collabRoleLabel">Host</span>
+                            </div>
+
+                            <label class="collab-live-label">Room code — share it to invite others</label>
+                            <div class="room-code-box">
+                                <span id="roomCode"></span>
+                                <button class="room-code-copy" onclick="copyRoomCode()" title="Copy code" aria-label="Copy room code">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+
+                            <button class="collab-btn collab-share-btn" onclick="shareRoomInvite()">
+                                <i class="fas fa-share-nodes"></i> Copy invite &amp; share
+                            </button>
+
+                            <div class="collab-live-actions">
+                                <button class="collab-btn collab-btn-ghost" onclick="manualReconnect()">
+                                    <i class="fas fa-rotate"></i> Reconnect
+                                </button>
+                                <button class="collab-btn collab-btn-danger" onclick="disconnectCollab()">
+                                    <i class="fas fa-right-from-bracket"></i> Leave
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="collabStatusConnected" class="collab-status"></div>
                     </div>
                 </div>
-                
+
+                <!-- ============ Same-browser panel ============ -->
                 <div class="collab-panel" id="broadcastPanel">
-                    <p class="collab-info">Sync across multiple tabs in the same browser. Great for testing!</p>
-                    <button class="btn btn-primary" onclick="toggleBroadcastSync()">
-                        <i class="fas fa-sync"></i> <span id="broadcastBtnText">Enable Tab Sync</span>
-                    </button>
+                    <div class="collab-card">
+                        <div class="collab-card-head">
+                            <span class="collab-card-icon"><i class="fas fa-window-restore"></i></span>
+                            <div>
+                                <h4>Sync across tabs</h4>
+                                <span class="collab-card-sub">Mirror your code in other tabs of this browser — great for testing</span>
+                            </div>
+                        </div>
+                        <button class="collab-btn collab-btn-primary" onclick="toggleBroadcastSync()">
+                            <i class="fas fa-arrows-rotate"></i> <span id="broadcastBtnText">Enable Tab Sync</span>
+                        </button>
+                    </div>
                     <div id="broadcastStatus" class="collab-status"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Username Prompt Modal -->
+    <div class="modal-overlay" id="usernameModal">
+        <div class="modal username-modal">
+            <div class="username-modal-head">
+                <span class="username-modal-icon"><i class="fas fa-user-pen"></i></span>
+                <div class="username-modal-text">
+                    <h3 id="usernameModalTitle">Choose a username</h3>
+                    <p id="usernameModalSub">This name is shown to others in the room</p>
+                </div>
+            </div>
+            <div class="username-modal-body">
+                <label for="usernameModalInput">Username</label>
+                <input type="text" id="usernameModalInput" placeholder="e.g. Ashish" maxlength="20" autocomplete="off" spellcheck="false">
+                <span class="username-modal-error" id="usernameModalError"></span>
+            </div>
+            <div class="username-modal-actions">
+                <button class="collab-btn collab-btn-ghost" type="button" onclick="cancelUsernameModal()">Cancel</button>
+                <button class="collab-btn collab-btn-primary" type="button" onclick="confirmUsernameModal()">
+                    <i class="fas fa-check"></i> Continue
+                </button>
             </div>
         </div>
     </div>

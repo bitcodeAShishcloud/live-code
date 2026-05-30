@@ -2987,11 +2987,12 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 let reconnectTimer = null;
 
-function saveCollabSession(role, code) {
+function saveCollabSession(role, code, username) {
     try {
         sessionStorage.setItem(COLLAB_SESSION_KEY, JSON.stringify({
             role: role, // 'host' or 'guest'
             roomCode: code,
+            username: username || null,
             timestamp: Date.now()
         }));
     } catch (err) {
@@ -3020,6 +3021,24 @@ function clearCollabSession() {
     sessionStorage.removeItem(COLLAB_SESSION_KEY);
 }
 
+// Toggle between the setup view (create/join) and the live connected view.
+function setCollabConnectedView(isConnected, opts = {}) {
+    const setupView = document.getElementById('collabSetupView');
+    const connectedView = document.getElementById('collabConnectedView');
+    const codeEl = document.getElementById('roomCode');
+    const roleLabel = document.getElementById('collabRoleLabel');
+
+    if (setupView) setupView.style.display = isConnected ? 'none' : 'block';
+    if (connectedView) connectedView.style.display = isConnected ? 'block' : 'none';
+
+    if (isConnected) {
+        if (codeEl && opts.code) codeEl.textContent = opts.code;
+        if (roleLabel && opts.role) {
+            roleLabel.textContent = opts.role === 'host' ? 'Host' : 'Guest';
+        }
+    }
+}
+
 function attemptReconnect() {
     const session = getCollabSession();
     if (!session || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
@@ -3033,10 +3052,10 @@ function attemptReconnect() {
     
     reconnectTimer = setTimeout(() => {
         if (session.role === 'host') {
-            createCollabRoom(session.roomCode);
+            createCollabRoom(session.roomCode, session.username);
         } else {
             document.getElementById('joinRoomCode').value = session.roomCode;
-            joinCollabRoom();
+            joinCollabRoom(session.username);
         }
     }, 2000 * reconnectAttempts); // Exponential backoff
 }
@@ -3046,7 +3065,100 @@ function generateRoomCode() {
            Math.random().toString(36).substr(2, 6).toUpperCase();
 }
 
-function createCollabRoom(existingCode = null) {
+// ==================== USERNAME PROMPT MODAL ====================
+// Promise-based replacement for the native prompt() dialog.
+let _usernameModalResolver = null;
+
+function askUsername(options = {}) {
+    const {
+        title = 'Choose a username',
+        subtitle = 'This name is shown to others in the room',
+        defaultValue = ''
+    } = options;
+
+    return new Promise((resolve) => {
+        const modal = document.getElementById('usernameModal');
+        const input = document.getElementById('usernameModalInput');
+        const titleEl = document.getElementById('usernameModalTitle');
+        const subEl = document.getElementById('usernameModalSub');
+        const errorEl = document.getElementById('usernameModalError');
+
+        if (!modal || !input) {
+            // Fallback to native prompt if modal markup is missing.
+            const fallback = prompt(title + ':', defaultValue);
+            resolve(fallback && fallback.trim() ? fallback.trim() : null);
+            return;
+        }
+
+        _usernameModalResolver = resolve;
+
+        if (titleEl) titleEl.textContent = title;
+        if (subEl) subEl.textContent = subtitle;
+        if (errorEl) errorEl.textContent = '';
+        input.classList.remove('invalid');
+        input.value = defaultValue;
+
+        modal.classList.add('active');
+        setTimeout(() => input.focus(), 50);
+    });
+}
+
+function confirmUsernameModal() {
+    const input = document.getElementById('usernameModalInput');
+    const errorEl = document.getElementById('usernameModalError');
+    const value = input ? input.value.trim() : '';
+
+    if (!value) {
+        if (input) input.classList.add('invalid');
+        if (errorEl) errorEl.textContent = 'Please enter a username to continue.';
+        if (input) input.focus();
+        return;
+    }
+
+    closeUsernameModal();
+    if (_usernameModalResolver) {
+        _usernameModalResolver(value);
+        _usernameModalResolver = null;
+    }
+}
+
+function cancelUsernameModal() {
+    closeUsernameModal();
+    if (_usernameModalResolver) {
+        _usernameModalResolver(null);
+        _usernameModalResolver = null;
+    }
+}
+
+function closeUsernameModal() {
+    const modal = document.getElementById('usernameModal');
+    if (modal) modal.classList.remove('active');
+}
+
+// Wire up Enter / Escape keys for the username modal.
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('usernameModalInput');
+    const modal = document.getElementById('usernameModal');
+    if (input) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmUsernameModal();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelUsernameModal();
+            }
+            input.classList.remove('invalid');
+        });
+    }
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) cancelUsernameModal();
+        });
+    }
+});
+
+function createCollabRoom(existingCode = null, knownUsername = null) {
     // Check if PeerJS is loaded
     if (typeof Peer === 'undefined') {
         showCollabStatus('webrtc', 'Loading PeerJS library... Please wait.', 'info');
@@ -3058,15 +3170,26 @@ function createCollabRoom(existingCode = null) {
         });
         return;
     }
-    
-    // Prompt for username if not already set
-    let username = prompt('Enter your username for collaboration:');
-    if (!username || !username.trim()) {
-        showCollabStatus('webrtc', '❌ Username is required to create a room', 'error');
+
+    // Use the stored username on reconnect, otherwise ask via custom modal.
+    if (knownUsername && knownUsername.trim()) {
+        startCollabRoom(existingCode, knownUsername.trim());
         return;
     }
-    username = username.trim();
-    
+
+    askUsername({
+        title: 'Create a room',
+        subtitle: 'Pick a username others will see'
+    }).then((username) => {
+        if (!username) {
+            showCollabStatus('webrtc', 'Username is required to create a room', 'error');
+            return;
+        }
+        startCollabRoom(existingCode, username);
+    });
+}
+
+function startCollabRoom(existingCode, username) {
     try {
         roomCode = existingCode || generateRoomCode();
         
@@ -3082,14 +3205,9 @@ function createCollabRoom(existingCode = null) {
         });
         
         peer.on('open', (id) => {
-            const display = document.getElementById('roomCodeDisplay');
-            const codeEl = document.getElementById('roomCode');
-            if (display && codeEl) {
-                display.style.display = 'block';
-                codeEl.textContent = id;
-            }
-            showCollabStatus('webrtc', `✅ Room created! Share code: ${id}`, 'success');
-            saveCollabSession('host', id);
+            setCollabConnectedView(true, { code: id, role: 'host' });
+            showCollabStatus('webrtc', `✅ Room created — you're in! Share the code to invite others.`, 'success');
+            saveCollabSession('host', id, username);
             reconnectAttempts = 0;
             
             // Auto-connect to chat with the same room code
@@ -3123,7 +3241,7 @@ function createCollabRoom(existingCode = null) {
     }
 }
 
-function joinCollabRoom() {
+function joinCollabRoom(knownUsername = null) {
     // Check if PeerJS is loaded
     if (typeof Peer === 'undefined') {
         showCollabStatus('webrtc', 'Loading PeerJS library... Please wait.', 'info');
@@ -3148,15 +3266,26 @@ function joinCollabRoom() {
         showCollabStatus('webrtc', '❌ Please enter a valid 12-character room code', 'error');
         return;
     }
-    
-    // Prompt for username if not already set
-    let username = prompt('Enter your username for collaboration:');
-    if (!username || !username.trim()) {
-        showCollabStatus('webrtc', '❌ Username is required to join a room', 'error');
+
+    // Use the stored username on reconnect, otherwise ask via custom modal.
+    if (knownUsername && knownUsername.trim()) {
+        startJoinRoom(code, knownUsername.trim());
         return;
     }
-    username = username.trim();
-    
+
+    askUsername({
+        title: 'Join a room',
+        subtitle: 'Pick a username others will see'
+    }).then((username) => {
+        if (!username) {
+            showCollabStatus('webrtc', 'Username is required to join a room', 'error');
+            return;
+        }
+        startJoinRoom(code, username);
+    });
+}
+
+function startJoinRoom(code, username) {
     try {
         // Create peer and connect to room
         peer = new Peer({
@@ -3173,7 +3302,8 @@ function joinCollabRoom() {
             showCollabStatus('webrtc', '🔄 Connecting to room...', 'info');
             conn = peer.connect(code, { reliable: true });
             setupPeerConnection();
-            saveCollabSession('guest', code);
+            saveCollabSession('guest', code, username);
+            setCollabConnectedView(true, { code: code, role: 'guest' });
             
             // Auto-connect to chat with the same room code
             if (window.socketClient && window.socketClient.isConnected()) {
@@ -3226,21 +3356,14 @@ function disconnectCollab() {
     reconnectAttempts = 0;
     
     // Also disconnect from chat
-    if (window.socketClient) {
-        window.socketClient.disconnect();
+    if (window.socketClient && window.socketClient.leaveRoom) {
+        window.socketClient.leaveRoom();
     }
     
-    const display = document.getElementById('roomCodeDisplay');
-    if (display) {
-        display.style.display = 'none';
-    }
+    // Return to the setup view
+    setCollabConnectedView(false);
     
-    const actions = document.getElementById('collabActions');
-    if (actions) {
-        actions.style.display = 'none';
-    }
-    
-    showCollabStatus('webrtc', 'Disconnected from collaboration session.', 'info');
+    showCollabStatus('webrtc', 'You left the session.', 'info');
 }
 
 function manualReconnect() {
@@ -3254,10 +3377,10 @@ function manualReconnect() {
     showCollabStatus('webrtc', '🔄 Reconnecting...', 'info');
     
     if (session.role === 'host') {
-        createCollabRoom(session.roomCode);
+        createCollabRoom(session.roomCode, session.username);
     } else {
         document.getElementById('joinRoomCode').value = session.roomCode;
-        joinCollabRoom();
+        joinCollabRoom(session.username);
     }
 }
 
@@ -3267,14 +3390,8 @@ function setupPeerConnection() {
     conn.on('open', () => {
         isCollabConnected = true;
         document.getElementById('collabIcon').classList.add('connected');
-        showCollabStatus('webrtc', '✅ Connected! You can now collaborate in real-time.', 'success');
+        showCollabStatus('webrtc', '✅ A peer connected — you can collaborate now!', 'success');
         reconnectAttempts = 0;
-        
-        // Show disconnect/reconnect buttons
-        const actions = document.getElementById('collabActions');
-        if (actions) {
-            actions.style.display = 'block';
-        }
         
         // Send current state
         sendCollabMessage({
@@ -3293,12 +3410,7 @@ function setupPeerConnection() {
     conn.on('close', () => {
         isCollabConnected = false;
         document.getElementById('collabIcon').classList.remove('connected');
-        showCollabStatus('webrtc', 'Disconnected from peer.', 'info');
-        
-        const actions = document.getElementById('collabActions');
-        if (actions) {
-            actions.style.display = 'none';
-        }
+        showCollabStatus('webrtc', 'The other peer left the room.', 'info');
     });
     
     conn.on('error', (err) => {
@@ -3413,14 +3525,40 @@ function copyRoomCode() {
 }
 
 function showCollabStatus(panel, message, type) {
-    const statusId = panel === 'webrtc' ? 'collabStatus' : 'broadcastStatus';
+    if (panel === 'broadcast') {
+        const status = document.getElementById('broadcastStatus');
+        if (status) {
+            status.textContent = message;
+            status.className = `collab-status ${type}`;
+        }
+        return;
+    }
+
+    // For the WebRTC panel, write to whichever status element is currently
+    // visible (setup view vs connected view).
+    const connectedView = document.getElementById('collabConnectedView');
+    const isConnectedViewOpen = connectedView && connectedView.style.display !== 'none';
+    const statusId = isConnectedViewOpen ? 'collabStatusConnected' : 'collabStatus';
     const status = document.getElementById(statusId);
     if (status) {
         status.textContent = message;
         status.className = `collab-status ${type}`;
-    } else {
-        console.warn(`Status element ${statusId} not found`);
     }
+}
+
+// Copy a friendly invite text (with the room code) to the clipboard.
+function shareRoomInvite() {
+    const code = document.getElementById('roomCode').textContent;
+    if (!code) {
+        showToast('No room code to share yet', 'error');
+        return;
+    }
+    const invite = `Join my live coding room on Live Compiler Pro!\nRoom code: ${code}`;
+    navigator.clipboard.writeText(invite).then(() => {
+        showToast('Invite copied — paste it to your team!', 'success');
+    }).catch(() => {
+        showToast('Could not copy invite', 'error');
+    });
 }
 
 // Override onCodeChange to broadcast changes
