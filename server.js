@@ -11,16 +11,33 @@ const cors = require('cors');
 const app = express();
 const server = http.createServer(app);
 
-// Configure Socket.io with CORS
+// Trust the hosting provider's reverse proxy (Render, Railway, Fly.io, etc.)
+// so secure WebSocket upgrades and client IPs are handled correctly.
+app.set('trust proxy', 1);
+
+// Allowed origins: "*" by default, or a comma-separated ALLOWED_ORIGINS env var.
+// Example: ALLOWED_ORIGINS=https://your-site.vercel.app,https://www.your-site.com
+const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
+const corsOrigin = allowedOriginsEnv
+    ? allowedOriginsEnv.split(',').map(o => o.trim()).filter(Boolean)
+    : "*";
+
+// Configure Socket.io with CORS + keepalive tuned for free-tier proxies
 const io = socketIO(server, {
     cors: {
-        origin: "*", // In production, specify your Vercel domain
-        methods: ["GET", "POST"]
-    }
+        origin: corsOrigin,
+        methods: ["GET", "POST"],
+        credentials: false
+    },
+    // Generous timeouts help on free hosts that can be slow to wake up
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    // Allow both transports; client upgrades to WebSocket when possible
+    transports: ['websocket', 'polling']
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 

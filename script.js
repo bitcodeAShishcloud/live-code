@@ -3571,18 +3571,14 @@ function showChatInterface() {
 function updateConnectionStatus(message, type) {
     const status = document.getElementById('chatConnectionStatus');
     if (!status) return;
-    
-    status.className = `chat-connection-status ${type}`;
+
+    // Map all status types to a CSS class the stylesheet understands
+    const cssClass = (type === 'connected' || type === 'success') ? 'connected'
+        : (type === 'connecting' || type === 'info' || type === 'warning') ? 'connecting'
+        : 'disconnected';
+
+    status.className = `chat-connection-status ${cssClass}`;
     status.innerHTML = `<i class="fas fa-circle"></i><span>${message}</span>`;
-    
-    if (type === 'connected') {
-        const user = window.socketClient ? window.socketClient.getCurrentUser() : null;
-        if (user && user.username && user.roomCode) {
-            showChatInterface();
-            const roomEl = document.getElementById('chatCurrentRoom');
-            if (roomEl) roomEl.textContent = user.roomCode;
-        }
-    }
 }
 
 function updateRoomUsersList(users) {

@@ -1,0 +1,19 @@
+# Render deployment config (free tier)
+# 1. Push this repo to GitHub
+# 2. On render.com: New + > Blueprint > pick your repo
+# 3. Render reads this file and creates the service automatically
+services:
+  - type: web
+    name: live-compiler-chat
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.0
+      # Lock chat to your frontend origin in production (optional but recommended).
+      # Replace with your real frontend URL, comma-separated for multiple:
+      # - key: ALLOWED_ORIGINS
+      #   value: https://your-site.vercel.app

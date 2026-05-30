@@ -1,8 +1,37 @@
 // ==================== SOCKET.IO CLIENT FOR CHAT & WEBRTC ====================
 // This file handles Socket.io connection, authentication, chat, and WebRTC signaling
 
-// Server URL - Change this to your deployed backend URL
-const SERVER_URL = 'http://localhost:3000';
+// ==================== SERVER URL CONFIGURATION ====================
+// The backend URL is auto-detected:
+//   - On localhost/127.0.0.1  -> http://localhost:3000
+//   - Anywhere else (deployed) -> value of window.CHAT_SERVER_URL
+//
+// To point the deployed frontend at your hosted backend, set this ONE line
+// in index.html BEFORE socket-client.js loads, e.g.:
+//   <script>window.CHAT_SERVER_URL = "https://your-app.onrender.com";</script>
+function resolveServerUrl() {
+    // Explicit override always wins
+    if (typeof window !== 'undefined' && window.CHAT_SERVER_URL) {
+        return window.CHAT_SERVER_URL;
+    }
+
+    const host = window.location.hostname;
+    const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '';
+
+    if (isLocal) {
+        return 'http://localhost:3000';
+    }
+
+    // Deployed but no override provided. Warn loudly so it's easy to diagnose.
+    console.warn(
+        '[chat] No window.CHAT_SERVER_URL set. Chat cannot reach a backend on a ' +
+        'deployed site. Add <script>window.CHAT_SERVER_URL="https://your-backend"' +
+        '</script> before socket-client.js in index.html.'
+    );
+    return null;
+}
+
+const SERVER_URL = resolveServerUrl();
 
 // Socket.io connection
 let socket = null;
@@ -26,9 +55,22 @@ const rtcConfiguration = {
 
 // ==================== SOCKET.IO CONNECTION ====================
 
-function connectToServer(serverUrl = 'http://localhost:3000') {
+function connectToServer(serverUrl = SERVER_URL) {
     if (socket && socket.connected) {
         console.log('Already connected to server');
+        return;
+    }
+
+    // No backend URL available (deployed without configuration)
+    if (!serverUrl) {
+        updateConnectionStatus('Chat server not configured for this site', 'disconnected');
+        return;
+    }
+
+    // Guard: Socket.io client library must be loaded
+    if (typeof io === 'undefined') {
+        console.error('[chat] Socket.io client library not loaded.');
+        updateConnectionStatus('Chat library failed to load', 'disconnected');
         return;
     }
 
@@ -37,28 +79,30 @@ function connectToServer(serverUrl = 'http://localhost:3000') {
         transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: 1000,
-        reconnectionAttempts: 5
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity,
+        timeout: 20000
     });
 
     // Connection successful
     socket.on('connect', () => {
         console.log('✅ Connected to server:', socket.id);
         isSocketConnected = true;
-        updateConnectionStatus('Connected to server', 'success');
+        updateConnectionStatus('Connected to server', 'connected');
     });
 
     // Connection error
     socket.on('connect_error', (error) => {
-        console.error('❌ Connection error:', error);
+        console.error('❌ Connection error:', error.message || error);
         isSocketConnected = false;
-        updateConnectionStatus('Failed to connect to server. Make sure the backend is running.', 'error');
+        updateConnectionStatus('Cannot reach chat server. Is the backend running?', 'disconnected');
     });
 
     // Disconnection
     socket.on('disconnect', (reason) => {
         console.log('⚠️ Disconnected from server:', reason);
         isSocketConnected = false;
-        updateConnectionStatus('Disconnected from server', 'warning');
+        updateConnectionStatus('Disconnected from server', 'disconnected');
         
         // Clean up WebRTC connections
         cleanupAllPeerConnections();
@@ -67,14 +111,14 @@ function connectToServer(serverUrl = 'http://localhost:3000') {
     // Reconnection attempt
     socket.on('reconnect_attempt', (attemptNumber) => {
         console.log(`🔄 Reconnection attempt ${attemptNumber}...`);
-        updateConnectionStatus(`Reconnecting... (Attempt ${attemptNumber})`, 'info');
+        updateConnectionStatus(`Reconnecting... (attempt ${attemptNumber})`, 'connecting');
     });
 
     // Reconnected
     socket.on('reconnect', () => {
         console.log('✅ Reconnected to server');
         isSocketConnected = true;
-        updateConnectionStatus('Reconnected to server', 'success');
+        updateConnectionStatus('Reconnected to server', 'connected');
         
         // Re-authenticate if we had a session
         if (currentUsername && currentRoomCode) {
@@ -91,9 +135,17 @@ function connectToServer(serverUrl = 'http://localhost:3000') {
             currentRoomCode = roomCode;
             roomUsers = usersInRoom;
             
-            updateConnectionStatus(`Connected to room ${roomCode} as ${username}`, 'success');
+            updateConnectionStatus(`Connected as ${username}`, 'connected');
             showChatInterface();
             updateRoomUsersList(usersInRoom);
+
+            // Show the active room code in the UI
+            const roomEl = document.getElementById('chatCurrentRoom');
+            if (roomEl) roomEl.textContent = roomCode;
+
+            // Sync the username field with the (possibly auto-generated) name
+            const authUsernameInput = document.getElementById('chatUsername');
+            if (authUsernameInput) authUsernameInput.value = username;
             
             // Show system message
             addChatMessage('System', `You joined room ${roomCode}`, 'system');
@@ -343,19 +395,6 @@ function clearChatNotifications() {
     updateChatNotificationBadge();
 }
 
-function updateRoomUsersList(users) {
-    const usersList = document.getElementById('roomUsersList');
-    if (!usersList) return;
-
-    usersList.innerHTML = users.map(user => `
-        <div class="room-user ${user.username === currentUsername ? 'current-user' : ''}">
-            <i class="fas fa-user"></i>
-            <span>${escapeHtml(user.username)}</span>
-            ${user.username === currentUsername ? '<span class="badge">You</span>' : ''}
-        </div>
-    `).join('');
-}
-
 // ==================== WEBRTC FUNCTIONS ====================
 
 async function initiateWebRTCCall(targetSocketId) {
@@ -527,37 +566,10 @@ function sendCodeChange(fileId, content) {
 }
 
 // ==================== UI HELPER FUNCTIONS ====================
-
-function updateConnectionStatus(message, type = 'info') {
-    const statusElement = document.getElementById('socketStatus');
-    if (!statusElement) return;
-
-    const icons = {
-        success: '✅',
-        error: '❌',
-        warning: '⚠️',
-        info: 'ℹ️'
-    };
-
-    statusElement.innerHTML = `${icons[type]} ${message}`;
-    statusElement.className = `socket-status ${type}`;
-}
-
-function showChatInterface() {
-    const chatContainer = document.getElementById('chatContainer');
-    const authContainer = document.getElementById('authContainer');
-    
-    if (chatContainer) chatContainer.style.display = 'flex';
-    if (authContainer) authContainer.style.display = 'none';
-}
-
-function hideChatInterface() {
-    const chatContainer = document.getElementById('chatContainer');
-    const authContainer = document.getElementById('authContainer');
-    
-    if (chatContainer) chatContainer.style.display = 'none';
-    if (authContainer) authContainer.style.display = 'flex';
-}
+// NOTE: updateConnectionStatus(), showChatInterface(), updateRoomUsersList(),
+// and showChatAuthForm() live in script.js because they reference the actual
+// chat panel element IDs in index.html. We rely on those here to avoid having
+// two conflicting versions fighting over the DOM.
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -578,8 +590,11 @@ function disconnectFromRoom() {
     currentRoomCode = null;
     roomUsers = [];
     
-    hideChatInterface();
-    updateConnectionStatus('Disconnected', 'info');
+    // Return to the auth form (defined in script.js)
+    if (typeof showChatAuthForm === 'function') {
+        showChatAuthForm();
+    }
+    updateConnectionStatus('Disconnected', 'disconnected');
 }
 
 // ==================== EXPORT FUNCTIONS ====================
