@@ -228,6 +228,26 @@ def static_files(filename: str):
     return send_from_directory(STATIC_DIR, filename)
 
 
+@app.after_request
+def add_cache_headers(response):
+    """
+    Prevent the browser from serving a stale index.html / JS / CSS.
+
+    HTML and the app's own JS/CSS are revalidated on every load so users always
+    get the latest deployed code (important after a redeploy). Static assets are
+    still versioned via ?v= query strings in index.html as a second safeguard.
+    """
+    try:
+        ctype = response.headers.get("Content-Type", "")
+        if any(t in ctype for t in ("text/html", "javascript", "text/css")):
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+    except Exception:
+        pass
+    return response
+
+
 # --------------------------------------------------------------------------- #
 # Socket.IO event handlers
 # --------------------------------------------------------------------------- #

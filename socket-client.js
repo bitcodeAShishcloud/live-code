@@ -21,9 +21,13 @@
 
     // Keys for persisting the chat session across page refreshes.
     // sessionStorage is per-tab, so two tabs can be two different users.
+    // Everything is stored CLIENT-SIDE only — nothing is kept on the server.
     const SESSION_KEY = "collabChatSession";
     const MESSAGES_KEY = "collabChatMessages";
     const MAX_SAVED_MESSAGES = 100;
+    // How long a saved session stays valid. After this, a refresh will NOT
+    // auto-rejoin and saved messages are dropped (30 minutes).
+    const SESSION_TTL_MS = 30 * 60 * 1000;
 
     // ---- State ----------------------------------------------------------- //
     let socket = null;
@@ -73,7 +77,11 @@
             if (currentUsername && currentRoomCode) {
                 sessionStorage.setItem(
                     SESSION_KEY,
-                    JSON.stringify({ username: currentUsername, roomCode: currentRoomCode })
+                    JSON.stringify({
+                        username: currentUsername,
+                        roomCode: currentRoomCode,
+                        savedAt: Date.now(),
+                    })
                 );
             }
         } catch (_) {
@@ -84,7 +92,14 @@
     function loadSession() {
         try {
             const raw = sessionStorage.getItem(SESSION_KEY);
-            return raw ? JSON.parse(raw) : null;
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            // Expire sessions older than the TTL.
+            if (!data.savedAt || Date.now() - data.savedAt > SESSION_TTL_MS) {
+                clearSession();
+                return null;
+            }
+            return data;
         } catch (_) {
             return null;
         }
@@ -107,6 +122,8 @@
             // Keep only the most recent N messages.
             const trimmed = list.slice(-MAX_SAVED_MESSAGES);
             sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(trimmed));
+            // Sliding expiry: any activity refreshes the session timestamp.
+            saveSession();
         } catch (_) {
             /* ignore */
         }
