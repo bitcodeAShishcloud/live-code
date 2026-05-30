@@ -275,6 +275,15 @@
                 <div class="message-content">
                     <span class="message-text">${escapeHtml(message)}</span>
                 </div>`;
+        } else if (type === "self") {
+            // Own messages: no need to repeat your own name, just the time.
+            wrap.innerHTML = `
+                <div class="message-header">
+                    <span class="message-time">${time}</span>
+                </div>
+                <div class="message-content">
+                    <span class="message-text">${escapeHtml(message)}</span>
+                </div>`;
         } else {
             wrap.innerHTML = `
                 <div class="message-header">
