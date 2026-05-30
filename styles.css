@@ -540,6 +540,26 @@ i, .fa, .fas, .fab, .far {
     color: white;
 }
 
+.file-tab .rename-file-icon {
+    opacity: 0;
+    padding: 4px;
+    border-radius: 3px;
+    transition: all 0.2s;
+    font-size: 0.8rem;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.file-tab:hover .rename-file-icon {
+    opacity: 0.8;
+}
+
+.file-tab .rename-file-icon:hover {
+    background: var(--accent);
+    color: white;
+    opacity: 1;
+}
+
 .add-file-btn {
     padding: 10px 16px;
     border-top: 1px solid var(--border-color);
@@ -1228,8 +1248,66 @@ i, .fa, .fas, .fab, .far {
     white-space: nowrap;
 }
 
-/* Console Input */
-.console-input-container {
+.console-log .console-log-text {
+    flex: 1;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.console-log .console-log-copy {
+    opacity: 0;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.console-log:hover .console-log-copy {
+    opacity: 0.7;
+}
+
+.console-log .console-log-copy:hover {
+    opacity: 1;
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* Console filter buttons */
+.console-filters {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+    margin-right: 8px;
+}
+
+.console-filter-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    font-family: inherit;
+    transition: all 0.15s ease;
+}
+
+.console-filter-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.console-filter-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
     display: flex;
     align-items: center;
     gap: 8px;

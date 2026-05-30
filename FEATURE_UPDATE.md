@@ -195,21 +195,21 @@ Added to Desktop Guide section:
 ## 🚀 FUTURE ENHANCEMENTS
 
 ### Console Input
-- [ ] Multi-line input support (Shift+Enter for new line)
+- [x] **Save command history to localStorage** ✅ — history now persists across sessions (last 100 commands)
+- [x] **Filter logs by type (log/error/warn/info)** ✅ — All / Logs / Warn / Errors filter buttons in console header
+- [x] **Copy log entry to clipboard** ✅ — hover any log entry and click the copy icon
+- [ ] Multi-line input support (needs switching the input to a textarea)
 - [ ] Syntax highlighting in input field
 - [ ] Auto-completion suggestions
-- [ ] Save command history to localStorage
-- [ ] Export console history
+- [ ] Export full console history
 - [ ] Clear individual log entries
-- [ ] Filter logs by type (log/error/warn/info)
-- [ ] Copy log entry to clipboard
 
 ### File Rename
-- [ ] Rename from file sidebar (not just editor tabs)
+- [x] **Rename from file sidebar (not just editor tabs)** ✅ — double-click a sidebar file, or click the pencil icon
+- [x] **Rename with keyboard shortcut (F2)** ✅ — renames the active file
+- [x] **Validate file names (no special characters)** ✅ — blocks `\ / : * ? " < > |`
 - [ ] Batch rename multiple files
-- [ ] Rename with keyboard shortcut (F2)
-- [ ] Show rename input on single-click + delay
-- [ ] Validate file names (no special characters)
+- [ ] Show rename input on single-click + delay (skipped: conflicts with file switching)
 
 ---
 

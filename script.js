@@ -639,10 +639,15 @@ function renderFileTabs() {
                 <div class="file-section-content ${isCollapsed ? 'collapsed' : ''}">
                     ${files.map(file => `
                         <div class="file-tab ${file.id === state.activeFileId ? 'active' : ''}" 
-                             onclick="switchFile(${file.id})">
+                             onclick="switchFile(${file.id})"
+                             ondblclick="event.stopPropagation(); startRenameFile(${file.id})"
+                             title="Double-click to rename">
                             <i class="fab ${getLanguageIcon(file.type)}" 
                                style="color: ${getLanguageColor(file.type)};"></i>
                             <span class="file-name">${file.name}</span>
+                            <i class="fas fa-pen rename-file-icon" 
+                               title="Rename"
+                               onclick="event.stopPropagation(); startRenameFile(${file.id})"></i>
                             <i class="fas fa-times close-tab" 
                                onclick="event.stopPropagation(); deleteFile(${file.id})"></i>
                         </div>
@@ -724,9 +729,16 @@ function startRenameFile(fileId) {
     const file = state.files.find(f => f.id === fileId);
     if (!file) return;
     
-    // Find the span element for this file
-    const span = document.querySelector(`.file-name-editable[data-file-id="${fileId}"]`);
-    if (!span) return;
+    // Find the span element for this file (lives in the editor tabs).
+    let span = document.querySelector(`.file-name-editable[data-file-id="${fileId}"]`);
+
+    // If it's not in the DOM yet (e.g. triggered from the sidebar), make this
+    // file active so its editor tab renders, then retry on the next frame.
+    if (!span) {
+        switchFile(fileId);
+        requestAnimationFrame(() => startRenameFile(fileId));
+        return;
+    }
     
     const currentName = file.name;
     const lastDotIndex = currentName.lastIndexOf('.');
@@ -754,6 +766,15 @@ function startRenameFile(fileId) {
         
         const newName = input.value.trim();
         if (newName && newName !== nameWithoutExt) {
+            // Validate: no path separators or characters illegal in filenames.
+            const invalidChars = /[\\/:*?"<>|]/;
+            if (invalidChars.test(newName)) {
+                showToast('Name cannot contain \\ / : * ? " < > |', 'error');
+                renderEditorTabs();
+                renderFileTabs();
+                return;
+            }
+
             const fullNewName = newName + ext;
             
             // Check for duplicate names
@@ -1980,13 +2001,33 @@ function clearConsole() {
 }
 
 // Console Input - Execute JavaScript code
+const CONSOLE_HISTORY_KEY = 'consoleCommandHistoryV1';
+
+function loadConsoleHistory() {
+    try {
+        const raw = localStorage.getItem(CONSOLE_HISTORY_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr.slice(-100) : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveConsoleHistory(history) {
+    try {
+        localStorage.setItem(CONSOLE_HISTORY_KEY, JSON.stringify(history.slice(-100)));
+    } catch (e) {
+        /* ignore quota errors */
+    }
+}
+
 function setupConsoleInput() {
     const consoleInput = document.getElementById('consoleInput');
     if (!consoleInput) return;
     
-    // Command history
-    const commandHistory = [];
-    let historyIndex = -1;
+    // Command history (persisted across sessions via localStorage).
+    const commandHistory = loadConsoleHistory();
+    let historyIndex = commandHistory.length;
     
     consoleInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
@@ -1994,8 +2035,11 @@ function setupConsoleInput() {
             const code = consoleInput.value.trim();
             
             if (code) {
-                // Add to history
-                commandHistory.push(code);
+                // Add to history (avoid consecutive duplicates).
+                if (commandHistory[commandHistory.length - 1] !== code) {
+                    commandHistory.push(code);
+                    saveConsoleHistory(commandHistory);
+                }
                 historyIndex = commandHistory.length;
                 
                 // Display the command in console
@@ -2091,14 +2135,52 @@ function logToConsole(type, content) {
     
     const logEntry = document.createElement('div');
     logEntry.className = `console-log ${logClass}`;
+    logEntry.dataset.logType = logClass;
+    const rawText = String(displayContent);
     logEntry.innerHTML = `
         <span class="timestamp">${timestamp}</span>
         <span>${icon}</span>
-        <span>${escapeHtml(String(displayContent))}</span>
+        <span class="console-log-text">${escapeHtml(rawText)}</span>
+        <button class="console-log-copy" title="Copy to clipboard" aria-label="Copy log entry">
+            <i class="fas fa-copy"></i>
+        </button>
     `;
-    
+
+    // Copy this entry's text to the clipboard.
+    const copyBtn = logEntry.querySelector('.console-log-copy');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            navigator.clipboard.writeText(rawText)
+                .then(() => showToast('Copied to clipboard', 'success'))
+                .catch(() => showToast('Copy failed', 'error'));
+        });
+    }
+
     consoleOutput.appendChild(logEntry);
     consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    applyConsoleFilter();
+}
+
+// ---- Console log filtering ----
+let consoleFilter = 'all';
+
+function setConsoleFilter(type) {
+    consoleFilter = type;
+    document.querySelectorAll('.console-filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === type);
+    });
+    applyConsoleFilter();
+}
+
+function applyConsoleFilter() {
+    const entries = consoleOutput ? consoleOutput.querySelectorAll('.console-log') : [];
+    entries.forEach(entry => {
+        const t = entry.dataset.logType;
+        // 'input' entries always stay visible so commands remain in context.
+        const show = consoleFilter === 'all' || t === consoleFilter || t === 'info';
+        entry.style.display = show ? '' : 'none';
+    });
 }
 
 function formatConsoleOutput(value) {
