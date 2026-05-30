@@ -420,10 +420,18 @@ def on_disconnect():
 def main() -> None:
     log.info("=" * 56)
     log.info("Live Compiler Pro collaboration server")
-    log.info("Listening on http://localhost:%d", PORT)
+    log.info("Listening on http://%s:%d", HOST, PORT)
     log.info("Room isolation: ON   |   WebRTC signaling: ON")
     log.info("=" * 56)
-    socketio.run(app, host=HOST, port=PORT)
+    # allow_unsafe_werkzeug=True lets the built-in server run on hosts like
+    # Render (it otherwise refuses to start outside debug mode). Fine for the
+    # threading async mode used here; for heavy traffic put it behind gunicorn.
+    socketio.run(
+        app,
+        host=HOST,
+        port=PORT,
+        allow_unsafe_werkzeug=True,
+    )
 
 
 if __name__ == "__main__":
