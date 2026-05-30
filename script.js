@@ -2508,6 +2508,10 @@ function tryHistoryAction(target, action) {
 function toggleTheme() {
     state.theme = state.theme === 'dark' ? 'light' : 'dark';
     applyTheme(state.theme);
+    // Re-render editors so the CodeMirror theme (dark vs light) matches.
+    if (typeof renderEditors === 'function') {
+        renderEditors();
+    }
     schedulePersistState();
     showToast(`${state.theme === 'dark' ? 'Dark' : 'Light'} theme activated`, 'success');
 }

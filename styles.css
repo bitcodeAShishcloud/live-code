@@ -36,19 +36,31 @@
 /* Light Theme */
 [data-theme="light"] {
     --bg-primary: #ffffff;
-    --bg-secondary: #f5f5f5;
-    --bg-tertiary: #e5e5e5;
-    --bg-hover: #d4d4d4;
-    --border-color: #e5e5e5;
-    --text-primary: #18181b;
-    --text-secondary: #52525b;
-    --accent: #6366f1;
-    --accent-hover: #4f46e5;
-    --accent-glow: rgba(99, 102, 241, 0.3);
-    --success: #10b981;
-    --warning: #f59e0b;
-    --error: #ef4444;
-    --info: #3b82f6;
+    --bg-secondary: #f1f3f7;
+    --bg-tertiary: #e4e7ee;
+    --bg-hover: #dde1ea;
+    --border-color: #d6dae3;
+    --text-primary: #1e2230;
+    --text-secondary: #5c6273;
+    --accent: #4f46e5;
+    --accent-hover: #4338ca;
+    --accent-glow: rgba(79, 70, 229, 0.25);
+    --success: #059669;
+    --warning: #d97706;
+    --error: #dc2626;
+    --info: #2563eb;
+
+    /* Language colors tuned for readability on light surfaces */
+    --html-color: #ea580c;
+    --css-color: #2563eb;
+    --js-color: #ca8a04;
+    --python-color: #0284c7;
+    --react-color: #0891b2;
+    --node-color: #16a34a;
+    --c-color: #475569;
+    --cpp-color: #2563eb;
+    --csharp-color: #9333ea;
+    --java-color: #ea580c;
 }
 
 body {
@@ -3753,4 +3765,163 @@ textarea::-webkit-scrollbar-thumb {
         align-items: flex-start;
         gap: 8px;
     }
+}
+
+
+/* ==================================================================== */
+/* LIGHT THEME OVERRIDES                                                 */
+/* Many components use hardcoded dark colors / white overlays that don't */
+/* adapt to the light palette. These overrides fix visibility in light   */
+/* mode without touching the dark theme.                                 */
+/* ==================================================================== */
+[data-theme="light"] .header {
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .activity-bar {
+    background: var(--bg-secondary);
+}
+
+[data-theme="light"] .logo-button:hover {
+    color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .run-mode-toggle {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .run-mode-toggle:hover {
+    background: rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .activity-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .sidebar-header {
+    background: rgba(0, 0, 0, 0.03);
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="light"] .file-tab:hover,
+[data-theme="light"] .editor-tab:hover,
+[data-theme="light"] .editor-tab .file-name-editable:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .editor-tabs {
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, #e9ecf3 100%);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+[data-theme="light"] .editor-tab {
+    border-right-color: var(--border-color);
+}
+
+[data-theme="light"] .editor-tab.active {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    box-shadow: inset 0 2px 0 0 rgba(0, 0, 0, 0.02), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .code-editor .cm-activeLineGutter {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .code-editor .cm-activeLine {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .preview-header {
+    background: rgba(255, 255, 255, 0.85);
+}
+
+/* Modals: switch the dark glass gradient to a clean light surface */
+[data-theme="light"] .modal {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .file-type-option,
+[data-theme="light"] .info-section,
+[data-theme="light"] .feature-item,
+[data-theme="light"] .guide-list li,
+[data-theme="light"] .shortcut-item,
+[data-theme="light"] .snippet-card {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+[data-theme="light"] .file-type-option:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--accent);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+}
+
+/* Collaboration + username modal headers used a translucent white wash */
+[data-theme="light"] .collab-head,
+[data-theme="light"] .username-modal-head {
+    background:
+        radial-gradient(120% 140% at 0% 0%, rgba(79, 70, 229, 0.12), transparent 60%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.02), transparent);
+}
+
+[data-theme="light"] .collab-close {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .collab-btn-ghost {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .collab-btn-ghost:hover {
+    background: var(--bg-hover);
+}
+
+[data-theme="light"] .collab-live-role {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .collab-tabs {
+    background: var(--bg-tertiary);
+}
+
+/* Console log copy button hover */
+[data-theme="light"] .console-log .console-log-copy:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+/* kbd shortcut pills */
+[data-theme="light"] kbd {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+/* Chat connection status default (no state) pill */
+[data-theme="light"] .chat-connection-status {
+    background: var(--bg-tertiary);
+}
+
+/* Code editor fallback textarea */
+[data-theme="light"] .code-editor textarea {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* CodeMirror surface in light mode (when oneDark is not applied) */
+[data-theme="light"] .code-editor .cm-editor,
+[data-theme="light"] .code-editor .cm-scroller {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .code-editor .cm-content {
+    caret-color: var(--text-primary);
 }
