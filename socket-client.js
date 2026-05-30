@@ -19,6 +19,12 @@
 
     const ROOM_CODE_LENGTH = 12;
 
+    // Keys for persisting the chat session across page refreshes.
+    // sessionStorage is per-tab, so two tabs can be two different users.
+    const SESSION_KEY = "collabChatSession";
+    const MESSAGES_KEY = "collabChatMessages";
+    const MAX_SAVED_MESSAGES = 100;
+
     // ---- State ----------------------------------------------------------- //
     let socket = null;
     let connected = false;
@@ -26,6 +32,14 @@
     let currentRoomCode = null;
     let roomUsers = [];
     let unreadCount = 0;
+    // True while we are auto-rejoining after a refresh (suppresses some UI).
+    let isRestoring = false;
+    let restoreRetried = false;
+    // Tracks the room/user we are actually authenticated as (set by the server
+    // "authenticated" event). Used to make authenticate() idempotent so the
+    // PeerJS collab flow and the chat restore don't double-join.
+    let authedUsername = null;
+    let authedRoomCode = null;
 
     // WebRTC peer connections keyed by remote socket id.
     const peerConnections = new Map();
@@ -48,6 +62,70 @@
     function isChatPanelOpen() {
         const panel = $("chatPanel");
         return !!(panel && panel.classList.contains("active"));
+    }
+
+    // ===================================================================== //
+    // Session persistence (survives page refresh via sessionStorage)
+    // ===================================================================== //
+
+    function saveSession() {
+        try {
+            if (currentUsername && currentRoomCode) {
+                sessionStorage.setItem(
+                    SESSION_KEY,
+                    JSON.stringify({ username: currentUsername, roomCode: currentRoomCode })
+                );
+            }
+        } catch (_) {
+            /* storage may be unavailable (private mode) */
+        }
+    }
+
+    function loadSession() {
+        try {
+            const raw = sessionStorage.getItem(SESSION_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function clearSession() {
+        try {
+            sessionStorage.removeItem(SESSION_KEY);
+            sessionStorage.removeItem(MESSAGES_KEY);
+        } catch (_) {
+            /* ignore */
+        }
+    }
+
+    // Persist a single chat/system message so it can be re-rendered on refresh.
+    function persistMessage(entry) {
+        try {
+            const list = JSON.parse(sessionStorage.getItem(MESSAGES_KEY) || "[]");
+            list.push(entry);
+            // Keep only the most recent N messages.
+            const trimmed = list.slice(-MAX_SAVED_MESSAGES);
+            sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(trimmed));
+        } catch (_) {
+            /* ignore */
+        }
+    }
+
+    function loadMessages() {
+        try {
+            return JSON.parse(sessionStorage.getItem(MESSAGES_KEY) || "[]");
+        } catch (_) {
+            return [];
+        }
+    }
+
+    // Re-render saved messages into the chat box (without re-persisting them).
+    function restoreMessages() {
+        const saved = loadMessages();
+        for (const m of saved) {
+            addMessage(m.username, m.message, m.type, m.timestamp, true);
+        }
     }
 
     // ===================================================================== //
@@ -74,13 +152,25 @@
     function registerSocketHandlers() {
         socket.on("connect", () => {
             connected = true;
-            setStatus("Connected. Enter a name and room to start.", "connected");
-            // Re-join automatically after a reconnect.
+            // If we already have an active session in memory, re-join it.
             if (currentUsername && currentRoomCode) {
                 socket.emit("authenticate", {
                     username: currentUsername,
                     roomCode: currentRoomCode,
                 });
+                return;
+            }
+            // On a fresh page load, try to restore a saved session (refresh case).
+            const saved = loadSession();
+            if (saved && saved.username && saved.roomCode) {
+                isRestoring = true;
+                setStatus("Rejoining your room...", "connected");
+                socket.emit("authenticate", {
+                    username: saved.username,
+                    roomCode: saved.roomCode,
+                });
+            } else {
+                setStatus("Connected. Enter a name and room to start.", "connected");
             }
         });
 
@@ -91,6 +181,8 @@
 
         socket.on("disconnect", () => {
             connected = false;
+            authedUsername = null;
+            authedRoomCode = null;
             setStatus("Disconnected from server.", "disconnected");
             cleanupAllPeers();
         });
@@ -99,13 +191,30 @@
         socket.on("authenticated", ({ roomCode, username, usersInRoom }) => {
             currentUsername = username;
             currentRoomCode = roomCode;
+            authedUsername = username;
+            authedRoomCode = roomCode;
             roomUsers = usersInRoom || [];
+
+            // Persist so a refresh can rejoin automatically.
+            saveSession();
 
             showChatInterface();
             const roomEl = $("chatCurrentRoom");
             if (roomEl) roomEl.textContent = roomCode;
             renderUsers(roomUsers);
-            addMessage("System", `You joined room ${roomCode}`, "system");
+
+            if (isRestoring) {
+                // Coming back from a refresh: re-render saved messages instead
+                // of showing a fresh "you joined" line.
+                isRestoring = false;
+                restoreRetried = false;
+                const box = $("chatMessages");
+                if (box) box.innerHTML = "";
+                restoreMessages();
+                addMessage("System", `Reconnected to room ${roomCode}`, "system");
+            } else {
+                addMessage("System", `You joined room ${roomCode}`, "system");
+            }
 
             // Make sure the chat panel is visible to the user.
             if (!isChatPanelOpen() && typeof switchSidebarTab === "function") {
@@ -114,6 +223,24 @@
         });
 
         socket.on("username-taken", ({ originalUsername, suggestions }) => {
+            // During an auto-restore (refresh), don't nag the user with a prompt.
+            // The previous socket may still be lingering on the server; retry
+            // once with a suggested name, otherwise fall back to manual entry.
+            if (isRestoring) {
+                const pick = (suggestions && suggestions[0]) || `${originalUsername}2`;
+                if (!restoreRetried) {
+                    restoreRetried = true;
+                    authenticate(pick, currentRoomCode);
+                } else {
+                    isRestoring = false;
+                    restoreRetried = false;
+                    clearSession();
+                    showAuthForm();
+                    setStatus("Couldn't rejoin automatically. Please join again.", "disconnected");
+                }
+                return;
+            }
+
             const list = (suggestions || []).join(", ");
             const pick = suggestions && suggestions[0];
             const ok = window.confirm(
@@ -190,13 +317,25 @@
 
     function authenticate(username, roomCode) {
         if (!socket || !socket.connected) {
-            setStatus("Not connected yet. Please wait a moment.", "disconnected");
+            // Remember intent so the "connect" handler can complete the join.
+            if (username && roomCode) {
+                currentUsername = username;
+                currentRoomCode = roomCode;
+            }
+            setStatus("Connecting... will join when ready.", "");
+            connect();
             return false;
         }
         if (!username || !roomCode) {
             setStatus("Username and room code are required.", "disconnected");
             return false;
         }
+        // Idempotent: ignore a duplicate join for the same room+user. This stops
+        // the PeerJS collab reconnect and the chat restore from double-joining.
+        if (authedUsername === username && authedRoomCode === roomCode) {
+            return true;
+        }
+        currentUsername = username;
         currentRoomCode = roomCode;
         socket.emit("authenticate", { username, roomCode });
         return true;
@@ -221,6 +360,8 @@
 
     function leaveRoom() {
         cleanupAllPeers();
+        // Clear persisted session so a refresh doesn't rejoin.
+        clearSession();
         if (socket && socket.connected) {
             // Disconnect then reconnect so the socket is fresh for the next room.
             socket.disconnect();
@@ -228,7 +369,13 @@
         }
         currentUsername = null;
         currentRoomCode = null;
+        authedUsername = null;
+        authedRoomCode = null;
         roomUsers = [];
+        isRestoring = false;
+        restoreRetried = false;
+        const box = $("chatMessages");
+        if (box) box.innerHTML = "";
         showAuthForm();
         clearNotifications();
         setStatus("You left the room.", "disconnected");
@@ -259,13 +406,12 @@
         if (ui) ui.style.display = "flex";
     }
 
-    function addMessage(username, message, type, timestamp) {
+    function addMessage(username, message, type, timestamp, skipPersist) {
         const box = $("chatMessages");
         if (!box) return;
 
-        const time = timestamp
-            ? new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        const ts = timestamp || new Date().toISOString();
+        const time = new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
         const wrap = document.createElement("div");
         wrap.className = `chat-message ${type}`;
@@ -289,8 +435,14 @@
         box.appendChild(wrap);
         box.scrollTop = box.scrollHeight;
 
+        // Persist real messages (chat from self/others) so a refresh can restore
+        // them. System lines are transient and are not saved.
+        if (!skipPersist && (type === "self" || type === "other")) {
+            persistMessage({ username, message, type, timestamp: ts });
+        }
+
         // Notify only for messages from others while the panel is closed.
-        if (type === "other" && !isChatPanelOpen()) {
+        if (type === "other" && !skipPersist && !isChatPanelOpen()) {
             unreadCount += 1;
             renderBadge();
             maybeBrowserNotify(username, message);
